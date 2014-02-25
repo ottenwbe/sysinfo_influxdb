@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"github.com/cloudfoundry/gosigar"
 	influxClient "github.com/influxdb/influxdb-go"
 )
@@ -16,6 +17,7 @@ const APP_VERSION = "0.1.0"
 // Variables storing arguments flags
 var verboseFlag bool
 var versionFlag bool
+var prefixFlag string
 
 func init() {
 	flag.BoolVar(&versionFlag, "version", false, "Print the version number and exit.")
@@ -23,6 +25,10 @@ func init() {
 
 	flag.BoolVar(&verboseFlag, "verbose", false, "Display debug information.")
 	flag.BoolVar(&verboseFlag, "v", false, "Display debug information (shorthand).")
+
+	hostname, _ := os.Hostname();
+	flag.StringVar(&prefixFlag, "prefix", hostname, "Change series name prefix.")
+	flag.StringVar(&prefixFlag, "p", hostname, "Change series name prefix (shorthand).")
 }
 
 func main() {
@@ -33,7 +39,7 @@ func main() {
 	} else {
 		var data []*influxClient.Series;
 
-		u, _ := cpus()
+		u, _ := cpus(prefixFlag)
 
 		data = append(data, u)
 
@@ -86,9 +92,13 @@ func send(config *influxClient.ClientConfig, series []*influxClient.Series) erro
  * Gathering functions
  */
 
-func cpus() (*influxClient.Series, error) {
+func cpus(prefix string) (*influxClient.Series, error) {
+	if prefix != "" {
+		prefix += "."
+	}
+
 	serie := &influxClient.Series{
-		Name:    "cpu",
+		Name:    prefix + "cpu",
 		Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
 		Points:  [][]interface{}{},
 	}
