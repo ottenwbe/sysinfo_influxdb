@@ -12,7 +12,7 @@ A collector of system metrics (CPU, Memory, Load, Network traffic) to an [Influx
 	cd $GOPATH
 	mkdir -p src/github.com/novaquark/
 	cd src/github.com/novaquark/
-	git clone sysinfo_influxdb
+	git clone https://github.com/novaquark/sysinfo_influxdb.git
 	cd sysinfo_influxdb
 	go get
 	go install
