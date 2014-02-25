@@ -66,6 +66,10 @@ func main() {
 		u, _ := cpus(prefixFlag)
 		data = append(data, u)
 
+		// Collect memory data
+		u, _ = mem(prefixFlag)
+		data = append(data, u)
+
 		// Fill InfluxDB connection settings
 		var config *influxClient.ClientConfig = nil;
 		if databaseFlag != "" {
@@ -150,4 +154,24 @@ func cpus(prefix string) (*influxClient.Series, error) {
 	}
 
 	return serie, nil;
+}
+
+func mem(prefix string) (*influxClient.Series, error) {
+	if prefix != "" {
+		prefix += "."
+	}
+
+	serie := &influxClient.Series{
+		Name:    prefix + "mem",
+		Columns: []string{"free", "used", "actualfree", "actualused", "total"},
+		Points:  [][]interface{}{},
+	}
+
+	mem := sigar.Mem{}
+	if err := mem.Get(); err != nil {
+		return nil, err
+	}
+	serie.Points = append(serie.Points, []interface{}{mem.Free, mem.Used, mem.ActualFree, mem.ActualUsed, mem.Total})
+
+	return serie, nil
 }
