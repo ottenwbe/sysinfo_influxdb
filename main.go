@@ -88,11 +88,16 @@ func main() {
 		// Collect data
 		var data []*influxClient.Series;
 
-		for _, c := range collectList {
-			if u, err := c(prefixFlag); err == nil {
-				data = append(data, u)
-			} else {
-				fmt.Fprintln(os.Stderr, err)
+		ch := make(chan *influxClient.Series, len(collectList))
+
+		for _, cl := range collectList {
+			go cl(prefixFlag, ch)
+		}
+
+		for i := len(collectList); i > 0; i-- {
+			res := <-ch
+			if res != nil {
+				data = append(data, res)
 			}
 		}
 
@@ -158,9 +163,9 @@ func send(config *influxClient.ClientConfig, series []*influxClient.Series) erro
  * Gathering functions
  */
 
-type GatherFunc func(string) (*influxClient.Series, error)
+type GatherFunc func(string, chan *influxClient.Series) error
 
-func cpus(prefix string) (*influxClient.Series, error) {
+func cpus(prefix string, ch chan *influxClient.Series) error {
 	if prefix != "" {
 		prefix += "."
 	}
@@ -173,7 +178,8 @@ func cpus(prefix string) (*influxClient.Series, error) {
 
 	cpu := sigar.Cpu{}
 	if err := cpu.Get(); err != nil {
-		return nil, err
+		ch <- nil
+		return err
 	}
 	serie.Points = append(serie.Points, []interface{}{"cpu", cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
 
@@ -183,10 +189,11 @@ func cpus(prefix string) (*influxClient.Series, error) {
 		serie.Points = append(serie.Points, []interface{}{fmt.Sprint("cpu", i), cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
 	}
 
-	return serie, nil;
+	ch <- serie
+	return nil;
 }
 
-func mem(prefix string) (*influxClient.Series, error) {
+func mem(prefix string, ch chan *influxClient.Series) error {
 	if prefix != "" {
 		prefix += "."
 	}
@@ -199,14 +206,16 @@ func mem(prefix string) (*influxClient.Series, error) {
 
 	mem := sigar.Mem{}
 	if err := mem.Get(); err != nil {
-		return nil, err
+		ch <- nil
+		return err
 	}
 	serie.Points = append(serie.Points, []interface{}{mem.Free, mem.Used, mem.ActualFree, mem.ActualUsed, mem.Total})
 
-	return serie, nil
+	ch <- serie
+	return nil
 }
 
-func swap(prefix string) (*influxClient.Series, error) {
+func swap(prefix string, ch chan *influxClient.Series) error {
 	if prefix != "" {
 		prefix += "."
 	}
@@ -219,14 +228,16 @@ func swap(prefix string) (*influxClient.Series, error) {
 
 	swap := sigar.Swap{}
 	if err := swap.Get(); err != nil {
-		return nil, err
+		ch <- nil
+		return err
 	}
 	serie.Points = append(serie.Points, []interface{}{swap.Free, swap.Used, swap.Total})
 
-	return serie, nil
+	ch <- serie
+	return nil
 }
 
-func uptime(prefix string) (*influxClient.Series, error) {
+func uptime(prefix string, ch chan *influxClient.Series) error {
 	if prefix != "" {
 		prefix += "."
 	}
@@ -239,14 +250,16 @@ func uptime(prefix string) (*influxClient.Series, error) {
 
 	uptime := sigar.Uptime{}
 	if err := uptime.Get(); err != nil {
-		return nil, err
+		ch <- nil
+		return err
 	}
 	serie.Points = append(serie.Points, []interface{}{uptime.Length})
 
-	return serie, nil
+	ch <- serie
+	return nil
 }
 
-func load(prefix string) (*influxClient.Series, error) {
+func load(prefix string, ch chan *influxClient.Series) error {
 	if prefix != "" {
 		prefix += "."
 	}
@@ -259,11 +272,13 @@ func load(prefix string) (*influxClient.Series, error) {
 
 	load := sigar.LoadAverage{}
 	if err := load.Get(); err != nil {
-		return nil, err
+		ch <- nil
+		return err
 	}
 	serie.Points = append(serie.Points, []interface{}{load.One, load.Five, load.Fifteen})
 
-	return serie, nil
+	ch <- serie
+	return nil
 }
 
 func gen_network() []GatherFunc {
@@ -287,8 +302,8 @@ func gen_network() []GatherFunc {
 		}
 
 		line := scanner.Text()
-		ret = append(ret, func (prefix string) (*influxClient.Series, error) {
-			return network_parse_iface_line(prefix, line)
+		ret = append(ret, func (prefix string, ch chan *influxClient.Series) error {
+			return network_parse_iface_line(prefix, ch, line)
 		})
 	}
 
@@ -300,14 +315,15 @@ func gen_network() []GatherFunc {
  * Network data related functions
  */
 
-func network_parse_iface_line(prefix string, line string) (*influxClient.Series, error) {
+func network_parse_iface_line(prefix string, ch chan *influxClient.Series, line string) error {
 	if prefix != "" {
 		prefix += "."
 	}
 
 	tmp := strings.Split(line, ":")
 	if len(tmp) < 2 {
-		return nil, nil
+		ch <- nil
+		return nil
 	}
 
 	iface := strings.Trim(tmp[0], " ")
@@ -337,5 +353,6 @@ func network_parse_iface_line(prefix string, line string) (*influxClient.Series,
 
 	serie.Points = append(serie.Points, points)
 
-	return serie, nil
+	ch <- serie
+	return nil
 }
