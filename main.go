@@ -74,6 +74,14 @@ func main() {
 		u, _ = swap(prefixFlag)
 		data = append(data, u)
 
+		// Collect uptime data
+		u, _ = uptime(prefixFlag)
+		data = append(data, u)
+
+		// Collect load average data
+		u, _ = load(prefixFlag)
+		data = append(data, u)
+
 		// Fill InfluxDB connection settings
 		var config *influxClient.ClientConfig = nil;
 		if databaseFlag != "" {
@@ -196,6 +204,46 @@ func swap(prefix string) (*influxClient.Series, error) {
 		return nil, err
 	}
 	serie.Points = append(serie.Points, []interface{}{swap.Free, swap.Used, swap.Total})
+
+	return serie, nil
+}
+
+func uptime(prefix string) (*influxClient.Series, error) {
+	if prefix != "" {
+		prefix += "."
+	}
+
+	serie := &influxClient.Series{
+		Name:    prefix + "uptime",
+		Columns: []string{"length"},
+		Points:  [][]interface{}{},
+	}
+
+	uptime := sigar.Uptime{}
+	if err := uptime.Get(); err != nil {
+		return nil, err
+	}
+	serie.Points = append(serie.Points, []interface{}{uptime.Length})
+
+	return serie, nil
+}
+
+func load(prefix string) (*influxClient.Series, error) {
+	if prefix != "" {
+		prefix += "."
+	}
+
+	serie := &influxClient.Series{
+		Name:    prefix + "load",
+		Columns: []string{"one", "five", "fifteen"},
+		Points:  [][]interface{}{},
+	}
+
+	load := sigar.LoadAverage{}
+	if err := load.Get(); err != nil {
+		return nil, err
+	}
+	serie.Points = append(serie.Points, []interface{}{load.One, load.Five, load.Fifteen})
 
 	return serie, nil
 }
