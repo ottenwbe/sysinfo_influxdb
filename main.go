@@ -70,6 +70,10 @@ func main() {
 		u, _ = mem(prefixFlag)
 		data = append(data, u)
 
+		// Collect swap data
+		u, _ = swap(prefixFlag)
+		data = append(data, u)
+
 		// Fill InfluxDB connection settings
 		var config *influxClient.ClientConfig = nil;
 		if databaseFlag != "" {
@@ -172,6 +176,26 @@ func mem(prefix string) (*influxClient.Series, error) {
 		return nil, err
 	}
 	serie.Points = append(serie.Points, []interface{}{mem.Free, mem.Used, mem.ActualFree, mem.ActualUsed, mem.Total})
+
+	return serie, nil
+}
+
+func swap(prefix string) (*influxClient.Series, error) {
+	if prefix != "" {
+		prefix += "."
+	}
+
+	serie := &influxClient.Series{
+		Name:    prefix + "swap",
+		Columns: []string{"free", "used", "total"},
+		Points:  [][]interface{}{},
+	}
+
+	swap := sigar.Swap{}
+	if err := swap.Get(); err != nil {
+		return nil, err
+	}
+	serie.Points = append(serie.Points, []interface{}{swap.Free, swap.Used, swap.Total})
 
 	return serie, nil
 }
