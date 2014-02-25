@@ -63,24 +63,39 @@ func main() {
 		var data []*influxClient.Series;
 
 		// Collect CPU data
-		u, _ := cpus(prefixFlag)
-		data = append(data, u)
+		if u, err := cpus(prefixFlag); err == nil {
+			data = append(data, u)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
 
 		// Collect memory data
-		u, _ = mem(prefixFlag)
-		data = append(data, u)
+		if u, err := mem(prefixFlag); err == nil {
+			data = append(data, u)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
 
 		// Collect swap data
-		u, _ = swap(prefixFlag)
-		data = append(data, u)
+		if u, err := swap(prefixFlag); err == nil {
+			data = append(data, u)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
 
 		// Collect uptime data
-		u, _ = uptime(prefixFlag)
-		data = append(data, u)
+		if u, err := uptime(prefixFlag); err == nil {
+			data = append(data, u)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
 
 		// Collect load average data
-		u, _ = load(prefixFlag)
-		data = append(data, u)
+		if u, err := load(prefixFlag); err == nil {
+			data = append(data, u)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
 
 		// Fill InfluxDB connection settings
 		var config *influxClient.ClientConfig = nil;
@@ -96,6 +111,7 @@ func main() {
 		send(config, data)
 	}
 }
+
 
 /**
  * Interactions with InfluxDB
@@ -137,6 +153,7 @@ func send(config *influxClient.ClientConfig, series []*influxClient.Series) erro
 
 	return nil
 }
+
 
 /**
  * Gathering functions
