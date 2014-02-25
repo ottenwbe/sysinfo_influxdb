@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/cloudfoundry/gosigar"
@@ -13,28 +12,90 @@ import (
 
 const APP_VERSION = "0.1.0"
 
-// The flag package provides a default help printer via -h switch
-var versionFlag *bool = flag.Bool("v", false, "Print the version number.")
+
+// Variables storing arguments flags
+var verboseFlag bool
+var versionFlag bool
+
+func init() {
+	flag.BoolVar(&versionFlag, "version", false, "Print the version number and exit.")
+	flag.BoolVar(&versionFlag, "V", false, "Print the version number and exit (shorthand).")
+
+	flag.BoolVar(&verboseFlag, "verbose", false, "Display debug information.")
+	flag.BoolVar(&verboseFlag, "v", false, "Display debug information (shorthand).")
+}
 
 func main() {
 	flag.Parse() // Scan the arguments list
 
-	if *versionFlag {
+	if versionFlag {
 		fmt.Println("Version:", APP_VERSION)
+	} else {
+		var data []*influxClient.Series;
+
+		u, _ := cpus()
+
+		data = append(data, u)
+
+		send(nil, data)
 	}
-	cpus()
 }
 
-func cpus() error {
+/**
+ * Interactions with InfluxDB
+ */
+
+func send(config *influxClient.ClientConfig, series []*influxClient.Series) error {
+	// Pretty printer
+	if config == nil || verboseFlag {
+		for ks, serie := range series {
+			nbCols := len(serie.Columns)
+
+			fmt.Printf("\n#%d: %s\n", ks, serie.Name)
+
+			for _, col := range serie.Columns {
+				fmt.Printf("| %s\t", col)
+			}
+			fmt.Println("|")
+
+			for _, value := range serie.Points {
+				fmt.Print("| ")
+				for i := 0; i < nbCols; i++ {
+					fmt.Print(value[i], "\t| ")
+				}
+				fmt.Print("\n")
+			}
+		}
+	}
+
+	// Write to InfluxDB
+	if config != nil {
+		client, err := influxClient.NewClient(config)
+
+		if err != nil {
+			return err
+		}
+
+		client.WriteSeries(series)
+	}
+
+	return nil
+}
+
+/**
+ * Gathering functions
+ */
+
+func cpus() (*influxClient.Series, error) {
 	serie := &influxClient.Series{
-		Name:    "test",
+		Name:    "cpu",
 		Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
 		Points:  [][]interface{}{},
 	}
-	
+
 	cpu := sigar.Cpu{}
 	if err := cpu.Get(); err != nil {
-		return err
+		return nil, err
 	}
 	serie.Points = append(serie.Points, []interface{}{"cpu", cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
 
@@ -44,8 +105,5 @@ func cpus() error {
 		serie.Points = append(serie.Points, []interface{}{fmt.Sprint("cpu", i), cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
 	}
 
-	b, _ := json.Marshal(serie)
-	fmt.Printf("%s", b)
-	//fmt.Printf("%2d %5d %5d %5d %5d %5d %5d\n",)
-	return nil;
+	return serie, nil;
 }
