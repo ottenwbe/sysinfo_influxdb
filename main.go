@@ -27,6 +27,7 @@ const APP_VERSION = "0.1.0"
 var verboseFlag bool
 var versionFlag bool
 var prefixFlag string
+var collectFlag string
 
 var hostFlag string
 var usernameFlag string
@@ -52,6 +53,9 @@ func init() {
 	flag.StringVar(&passwordFlag, "p", "root", "Password to use when connecting to server (shorthand).")
 	flag.StringVar(&databaseFlag, "database", "", "Name of the database to use.")
 	flag.StringVar(&databaseFlag, "d", "", "Name of the database to use (shorthand).")
+
+	flag.StringVar(&collectFlag, "collect", "cpus,mem,swap,uptime,load,network", "Chose which data to collect.")
+	flag.StringVar(&collectFlag, "c", "cpus,mem,swap,uptime,load,network", "Chose which data to collect (shorthand).")
 }
 
 func main() {
@@ -60,50 +64,36 @@ func main() {
 	if versionFlag {
 		fmt.Println("Version:", APP_VERSION)
 	} else {
+		var collectList []GatherFunc
+
+		for _, c := range strings.Split(collectFlag, ",") {
+			switch(strings.Trim(c, " ")) {
+			case "cpus":
+				collectList = append(collectList, cpus)
+			case "mem":
+				collectList = append(collectList, mem)
+			case "swap":
+				collectList = append(collectList, swap)
+			case "uptime":
+				collectList = append(collectList, uptime)
+			case "load":
+				collectList = append(collectList, load)
+			case "network":
+				for _, d := range gen_network() {
+					collectList = append(collectList, d)
+				}
+			}
+		}
+
+		// Collect data
 		var data []*influxClient.Series;
 
-		// Collect CPU data
-		if u, err := cpus(prefixFlag); err == nil {
-			data = append(data, u)
-		} else {
-			fmt.Fprintln(os.Stderr, err)
-		}
-
-		// Collect memory data
-		if u, err := mem(prefixFlag); err == nil {
-			data = append(data, u)
-		} else {
-			fmt.Fprintln(os.Stderr, err)
-		}
-
-		// Collect swap data
-		if u, err := swap(prefixFlag); err == nil {
-			data = append(data, u)
-		} else {
-			fmt.Fprintln(os.Stderr, err)
-		}
-
-		// Collect uptime data
-		if u, err := uptime(prefixFlag); err == nil {
-			data = append(data, u)
-		} else {
-			fmt.Fprintln(os.Stderr, err)
-		}
-
-		// Collect load average data
-		if u, err := load(prefixFlag); err == nil {
-			data = append(data, u)
-		} else {
-			fmt.Fprintln(os.Stderr, err)
-		}
-
-		// Collect network data
-		if u, err := network(prefixFlag); err == nil {
-			for _, v := range u {
-				data = append(data, v)
+		for _, c := range collectList {
+			if u, err := c(prefixFlag); err == nil {
+				data = append(data, u)
+			} else {
+				fmt.Fprintln(os.Stderr, err)
 			}
-		} else {
-			fmt.Fprintln(os.Stderr, err)
 		}
 
 		// Fill InfluxDB connection settings
@@ -167,6 +157,8 @@ func send(config *influxClient.ClientConfig, series []*influxClient.Series) erro
 /**
  * Gathering functions
  */
+
+type GatherFunc func(string) (*influxClient.Series, error)
 
 func cpus(prefix string) (*influxClient.Series, error) {
 	if prefix != "" {
@@ -274,24 +266,33 @@ func load(prefix string) (*influxClient.Series, error) {
 	return serie, nil
 }
 
-func network(prefix string) ([]*influxClient.Series, error) {
+func gen_network() []GatherFunc {
+	var ret []GatherFunc
+
 	fi, err := os.Open("/proc/net/dev")
 	if err != nil {
-		return nil, err
+		fmt.Fprintln(os.Stderr, err)
+		return ret
 	}
 	defer fi.Close()
 
-	var series []*influxClient.Series
-
 	// Search interface
+	skip := 2
 	scanner := bufio.NewScanner(fi)
 	for scanner.Scan() {
-		if u, err := network_parse_iface_line(prefix, scanner.Text()); err == nil && u != nil {
-			series = append(series, u)
+		// Skip headers
+		if skip > 0 {
+			skip--
+			continue
 		}
+
+		line := scanner.Text()
+		ret = append(ret, func (prefix string) (*influxClient.Series, error) {
+			return network_parse_iface_line(prefix, line)
+		})
 	}
 
-	return series, nil
+	return ret
 }
 
 
