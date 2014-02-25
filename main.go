@@ -10,15 +10,15 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"github.com/cloudfoundry/gosigar"
 	influxClient "github.com/influxdb/influxdb-go"
 )
-// use of cat /proc/net/dev for basic network traffic else create an export for collectl
-// http://stackoverflow.com/questions/15825007/golang-how-to-ignore-fields-with-sscanf-is-rejected
-// http://stackoverflow.com/questions/1052589/how-can-i-parse-the-output-of-proc-net-dev-into-keyvalue-pairs-per-interface-u
 
 const APP_VERSION = "0.1.0"
 
@@ -93,6 +93,15 @@ func main() {
 		// Collect load average data
 		if u, err := load(prefixFlag); err == nil {
 			data = append(data, u)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
+
+		// Collect network data
+		if u, err := network(prefixFlag); err == nil {
+			for _, v := range u {
+				data = append(data, v)
+			}
 		} else {
 			fmt.Fprintln(os.Stderr, err)
 		}
@@ -261,6 +270,71 @@ func load(prefix string) (*influxClient.Series, error) {
 		return nil, err
 	}
 	serie.Points = append(serie.Points, []interface{}{load.One, load.Five, load.Fifteen})
+
+	return serie, nil
+}
+
+func network(prefix string) ([]*influxClient.Series, error) {
+	fi, err := os.Open("/proc/net/dev")
+	if err != nil {
+		return nil, err
+	}
+	defer fi.Close()
+
+	var series []*influxClient.Series
+
+	// Search interface
+	scanner := bufio.NewScanner(fi)
+	for scanner.Scan() {
+		if u, err := network_parse_iface_line(prefix, scanner.Text()); err == nil && u != nil {
+			series = append(series, u)
+		}
+	}
+
+	return series, nil
+}
+
+
+/**
+ * Network data related functions
+ */
+
+func network_parse_iface_line(prefix string, line string) (*influxClient.Series, error) {
+	if prefix != "" {
+		prefix += "."
+	}
+
+	tmp := strings.Split(line, ":")
+	if len(tmp) < 2 {
+		return nil, nil
+	}
+
+	iface := strings.Trim(tmp[0], " ")
+
+	serie := &influxClient.Series{
+		Name:    prefix + iface,
+		Columns: []string{ "recv_bytes", "recv_packets", "recv_errs",
+			           "recv_drop", "recv_fifo", "recv_frame",
+			           "recv_compressed", "recv_multicast",
+			           "trans_bytes", "trans_packets", "trans_errs",
+			           "trans_drop", "trans_fifo", "trans_colls",
+			           "trans_carrier", "trans_compressed" },
+		Points:  [][]interface{}{},
+	}
+
+	tmp = strings.Fields(tmp[1])
+
+	var points []interface{}
+
+	for i := 0; i < len(serie.Columns); i++ {
+		if v, err := strconv.Atoi(tmp[i]); err == nil {
+			points = append(points, v)
+		} else {
+			points = append(points, 0)
+		}
+	}
+
+	serie.Points = append(serie.Points, points)
 
 	return serie, nil
 }
