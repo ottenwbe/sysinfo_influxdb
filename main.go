@@ -28,6 +28,11 @@ var verboseFlag bool
 var versionFlag bool
 var prefixFlag string
 
+var hostFlag string
+var usernameFlag string
+var passwordFlag string
+var databaseFlag string
+
 func init() {
 	flag.BoolVar(&versionFlag, "version", false, "Print the version number and exit.")
 	flag.BoolVar(&versionFlag, "V", false, "Print the version number and exit (shorthand).")
@@ -37,7 +42,16 @@ func init() {
 
 	hostname, _ := os.Hostname();
 	flag.StringVar(&prefixFlag, "prefix", hostname, "Change series name prefix.")
-	flag.StringVar(&prefixFlag, "p", hostname, "Change series name prefix (shorthand).")
+	flag.StringVar(&prefixFlag, "P", hostname, "Change series name prefix (shorthand).")
+
+	flag.StringVar(&hostFlag, "host", "localhost:8086", "Connect to host.")
+	flag.StringVar(&hostFlag, "h", "localhost:8086", "Connect to host (shorthand).")
+	flag.StringVar(&usernameFlag, "username", "root", "User for login.")
+	flag.StringVar(&usernameFlag, "u", "root", "User for login (shorthand).")
+	flag.StringVar(&passwordFlag, "password", "root", "Password to use when connecting to server.")
+	flag.StringVar(&passwordFlag, "p", "root", "Password to use when connecting to server (shorthand).")
+	flag.StringVar(&databaseFlag, "database", "", "Name of the database to use.")
+	flag.StringVar(&databaseFlag, "d", "", "Name of the database to use (shorthand).")
 }
 
 func main() {
@@ -48,11 +62,22 @@ func main() {
 	} else {
 		var data []*influxClient.Series;
 
+		// Collect CPU data
 		u, _ := cpus(prefixFlag)
-
 		data = append(data, u)
 
-		send(nil, data)
+		// Fill InfluxDB connection settings
+		var config *influxClient.ClientConfig = nil;
+		if databaseFlag != "" {
+			config = new(influxClient.ClientConfig)
+
+			config.Host = hostFlag
+			config.Username = usernameFlag
+			config.Password = passwordFlag
+			config.Database = databaseFlag
+		}
+
+		send(config, data)
 	}
 }
 
