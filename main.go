@@ -16,6 +16,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"github.com/cloudfoundry/gosigar"
 	influxClient "github.com/influxdb/influxdb-go"
 )
@@ -26,6 +27,7 @@ const APP_VERSION = "0.1.0"
 // Variables storing arguments flags
 var verboseFlag bool
 var versionFlag bool
+var daemonFlag bool
 var prefixFlag string
 var collectFlag string
 
@@ -56,6 +58,9 @@ func init() {
 
 	flag.StringVar(&collectFlag, "collect", "cpus,mem,swap,uptime,load,network", "Chose which data to collect.")
 	flag.StringVar(&collectFlag, "c", "cpus,mem,swap,uptime,load,network", "Chose which data to collect (shorthand).")
+
+	flag.BoolVar(&daemonFlag, "daemon", false, "Run in daemon mode.")
+	flag.BoolVar(&daemonFlag, "D", false, "Run in daemon mode (shorthand).")
 }
 
 func main() {
@@ -64,8 +69,26 @@ func main() {
 	if versionFlag {
 		fmt.Println("Version:", APP_VERSION)
 	} else {
-		var collectList []GatherFunc
+		// Fill InfluxDB connection settings
+		var client *influxClient.Client = nil;
+		if databaseFlag != "" {
+			config := new(influxClient.ClientConfig)
 
+			config.Host = hostFlag
+			config.Username = usernameFlag
+			config.Password = passwordFlag
+			config.Database = databaseFlag
+
+			var err error
+			client, err = influxClient.NewClient(config)
+
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		// Build collect functions
+		var collectList []GatherFunc
 		for _, c := range strings.Split(collectFlag, ",") {
 			switch(strings.Trim(c, " ")) {
 			case "cpus":
@@ -85,77 +108,69 @@ func main() {
 			}
 		}
 
-		// Collect data
-		var data []*influxClient.Series;
-
 		ch := make(chan *influxClient.Series, len(collectList))
 
-		for _, cl := range collectList {
-			go cl(prefixFlag, ch)
-		}
+		first := true
 
-		for i := len(collectList); i > 0; i-- {
-			res := <-ch
-			if res != nil {
-				data = append(data, res)
+		for first || daemonFlag {
+			if daemonFlag {
+				time.Sleep(time.Second)
+			}
+			if first {
+				first = false
+			}
+
+			// Collect data
+			var data []*influxClient.Series;
+
+			for _, cl := range collectList {
+				go cl(prefixFlag, ch)
+			}
+
+			for i := len(collectList); i > 0; i-- {
+				res := <-ch
+				if res != nil {
+					data = append(data, res)
+				}
+			}
+
+			if databaseFlag == "" || verboseFlag {
+				prettyPrinter(data)
+			}
+			if client != nil {
+				send(client, data)
 			}
 		}
-
-		// Fill InfluxDB connection settings
-		var config *influxClient.ClientConfig = nil;
-		if databaseFlag != "" {
-			config = new(influxClient.ClientConfig)
-
-			config.Host = hostFlag
-			config.Username = usernameFlag
-			config.Password = passwordFlag
-			config.Database = databaseFlag
-		}
-
-		send(config, data)
 	}
 }
 
+func prettyPrinter(series []*influxClient.Series) {
+	for ks, serie := range series {
+		nbCols := len(serie.Columns)
+
+		fmt.Printf("\n#%d: %s\n", ks, serie.Name)
+
+		for _, col := range serie.Columns {
+			fmt.Printf("| %s\t", col)
+		}
+		fmt.Println("|")
+
+		for _, value := range serie.Points {
+			fmt.Print("| ")
+			for i := 0; i < nbCols; i++ {
+				fmt.Print(value[i], "\t| ")
+			}
+			fmt.Print("\n")
+		}
+	}
+}
 
 /**
  * Interactions with InfluxDB
  */
 
-func send(config *influxClient.ClientConfig, series []*influxClient.Series) error {
-	// Pretty printer
-	if config == nil || verboseFlag {
-		for ks, serie := range series {
-			nbCols := len(serie.Columns)
-
-			fmt.Printf("\n#%d: %s\n", ks, serie.Name)
-
-			for _, col := range serie.Columns {
-				fmt.Printf("| %s\t", col)
-			}
-			fmt.Println("|")
-
-			for _, value := range serie.Points {
-				fmt.Print("| ")
-				for i := 0; i < nbCols; i++ {
-					fmt.Print(value[i], "\t| ")
-				}
-				fmt.Print("\n")
-			}
-		}
-	}
-
-	// Write to InfluxDB
-	if config != nil {
-		client, err := influxClient.NewClient(config)
-
-		if err != nil {
-			return err
-		}
-
-		client.WriteSeries(series)
-	}
-
-	return nil
+func send(client *influxClient.Client, series []*influxClient.Series) error {
+	return client.WriteSeries(series)
 }
 
 
