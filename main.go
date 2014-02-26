@@ -116,9 +116,6 @@ func main() {
 		first := true
 
 		for first || daemonFlag {
-			if daemonFlag {
-				time.Sleep(daemonIntervalFlag)
-			}
 			if first {
 				first = false
 			}
@@ -134,18 +131,25 @@ func main() {
 				res := <-ch
 				if res != nil {
 					data = append(data, res)
+				} else {
+					// Loop if we haven't all data
+					first = true
 				}
 			}
 
 			// Show data
-			if databaseFlag == "" || verboseFlag {
+			if (databaseFlag == "" && !first) || verboseFlag {
 				prettyPrinter(data)
 			}
 			// Send data
-			if client != nil {
+			if client != nil && !first {
 				if err := send(client, data); err != nil {
 					panic(err)
 				}
+			}
+
+			if daemonFlag || first {
+				time.Sleep(daemonIntervalFlag)
 			}
 		}
 	}
