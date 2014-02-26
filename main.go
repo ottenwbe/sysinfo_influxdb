@@ -57,8 +57,8 @@ func init() {
 	flag.StringVar(&databaseFlag, "database", "", "Name of the database to use.")
 	flag.StringVar(&databaseFlag, "d", "", "Name of the database to use (shorthand).")
 
-	flag.StringVar(&collectFlag, "collect", "cpus,mem,swap,uptime,load,network", "Chose which data to collect.")
-	flag.StringVar(&collectFlag, "c", "cpus,mem,swap,uptime,load,network", "Chose which data to collect (shorthand).")
+	flag.StringVar(&collectFlag, "collect", "cpus,mem,swap,uptime,load,network,disk", "Chose which data to collect.")
+	flag.StringVar(&collectFlag, "c", "cpus,mem,swap,uptime,load,network,disk", "Chose which data to collect (shorthand).")
 
 	flag.BoolVar(&daemonFlag, "daemon", false, "Run in daemon mode.")
 	flag.BoolVar(&daemonFlag, "D", false, "Run in daemon mode (shorthand).")
@@ -106,6 +106,10 @@ func main() {
 				collectList = append(collectList, load)
 			case "network":
 				for _, d := range gen_network() {
+					collectList = append(collectList, d)
+				}
+			case "disk":
+				for _, d := range gen_disk() {
 					collectList = append(collectList, d)
 				}
 			}
@@ -330,6 +334,28 @@ func gen_network() []GatherFunc {
 	return ret
 }
 
+func gen_disk() []GatherFunc {
+	var ret []GatherFunc
+
+	fi, err := os.Open("/proc/diskstats")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return ret
+	}
+	defer fi.Close()
+
+	// Search interface
+	scanner := bufio.NewScanner(fi)
+	for scanner.Scan() {
+		line := scanner.Text()
+		ret = append(ret, func (prefix string, ch chan *influxClient.Series) error {
+			return disk_parse_line(prefix, ch, line)
+		})
+	}
+
+	return ret
+}
+
 
 /**
  * Network data related functions
@@ -365,6 +391,48 @@ func network_parse_iface_line(prefix string, ch chan *influxClient.Series, line 
 
 	for i := 0; i < len(serie.Columns); i++ {
 		if v, err := strconv.Atoi(tmp[i]); err == nil {
+			points = append(points, v)
+		} else {
+			points = append(points, 0)
+		}
+	}
+
+	serie.Points = append(serie.Points, points)
+
+	ch <- serie
+	return nil
+}
+
+
+/**
+ * Disk data related functions
+ */
+
+func disk_parse_line(prefix string, ch chan *influxClient.Series, line string) error {
+	if prefix != "" {
+		prefix += "."
+	}
+
+	tmp := strings.Fields(line)
+	if len(tmp) < 14 {
+		ch <- nil
+		return nil
+	}
+
+	dev := tmp[2]
+
+	serie := &influxClient.Series{
+		Name:    prefix + dev,
+		Columns: []string{ "read_ios", "read_merges", "read_sectors", "read_ticks",
+			           "write_ios", "write_merges", "write_sectors", "write_ticks",
+			           "in_flight", "io_ticks", "time_in_queue" },
+		Points:  [][]interface{}{},
+	}
+
+	var points []interface{}
+
+	for i := 0; i < len(serie.Columns); i++ {
+		if v, err := strconv.Atoi(tmp[3 + i]); err == nil {
 			points = append(points, v)
 		} else {
 			points = append(points, 0)
