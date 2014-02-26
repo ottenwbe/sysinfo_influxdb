@@ -28,6 +28,7 @@ const APP_VERSION = "0.1.0"
 var verboseFlag bool
 var versionFlag bool
 var daemonFlag bool
+var daemonIntervalFlag time.Duration
 var prefixFlag string
 var collectFlag string
 
@@ -61,6 +62,8 @@ func init() {
 
 	flag.BoolVar(&daemonFlag, "daemon", false, "Run in daemon mode.")
 	flag.BoolVar(&daemonFlag, "D", false, "Run in daemon mode (shorthand).")
+	flag.DurationVar(&daemonIntervalFlag, "interval", time.Second, "With daemon mode, change time between checks.")
+	flag.DurationVar(&daemonIntervalFlag, "i", time.Second, "With daemon mode, change time between checks (shorthand).")
 }
 
 func main() {
@@ -114,7 +117,7 @@ func main() {
 
 		for first || daemonFlag {
 			if daemonFlag {
-				time.Sleep(time.Second)
+				time.Sleep(daemonIntervalFlag)
 			}
 			if first {
 				first = false
@@ -138,7 +141,9 @@ func main() {
 				prettyPrinter(data)
 			}
 			if client != nil {
-				send(client, data)
+				if err := send(client, data); err != nil {
+					panic(err)
+				}
 			}
 		}
 	}
