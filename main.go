@@ -21,7 +21,7 @@ import (
 	influxClient "github.com/influxdb/influxdb-go"
 )
 
-const APP_VERSION = "0.1.0"
+const APP_VERSION = "0.2.0"
 
 
 // Variables storing arguments flags
