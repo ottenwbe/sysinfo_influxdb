@@ -111,6 +111,10 @@ func main() {
 			}
 		}
 
+		if prefixFlag != "" && prefixFlag[len(prefixFlag) - 1] != "." {
+			prefixFlag += "."
+		}
+
 		ch := make(chan *influxClient.Series, len(collectList))
 
 		first := true
@@ -253,10 +257,6 @@ func diff_from_last(serie *influxClient.Series) *influxClient.Series {
 type GatherFunc func(string, chan *influxClient.Series) error
 
 func cpus(prefix string, ch chan *influxClient.Series) error {
-	if prefix != "" {
-		prefix += "."
-	}
-
 	serie := &influxClient.Series{
 		Name:    prefix + "cpu",
 		Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
@@ -281,10 +281,6 @@ func cpus(prefix string, ch chan *influxClient.Series) error {
 }
 
 func mem(prefix string, ch chan *influxClient.Series) error {
-	if prefix != "" {
-		prefix += "."
-	}
-
 	serie := &influxClient.Series{
 		Name:    prefix + "mem",
 		Columns: []string{"free", "used", "actualfree", "actualused", "total"},
@@ -303,10 +299,6 @@ func mem(prefix string, ch chan *influxClient.Series) error {
 }
 
 func swap(prefix string, ch chan *influxClient.Series) error {
-	if prefix != "" {
-		prefix += "."
-	}
-
 	serie := &influxClient.Series{
 		Name:    prefix + "swap",
 		Columns: []string{"free", "used", "total"},
@@ -325,10 +317,6 @@ func swap(prefix string, ch chan *influxClient.Series) error {
 }
 
 func uptime(prefix string, ch chan *influxClient.Series) error {
-	if prefix != "" {
-		prefix += "."
-	}
-
 	serie := &influxClient.Series{
 		Name:    prefix + "uptime",
 		Columns: []string{"length"},
@@ -347,10 +335,6 @@ func uptime(prefix string, ch chan *influxClient.Series) error {
 }
 
 func load(prefix string, ch chan *influxClient.Series) error {
-	if prefix != "" {
-		prefix += "."
-	}
-
 	serie := &influxClient.Series{
 		Name:    prefix + "load",
 		Columns: []string{"one", "five", "fifteen"},
@@ -374,10 +358,6 @@ func network(prefix string, ch chan *influxClient.Series) error {
 		return err
 	}
 	defer fi.Close()
-
-	if prefix != "" {
-		prefix += "."
-	}
 
 	serie := &influxClient.Series{
 		Name:    prefix + "network",
@@ -435,10 +415,6 @@ func disks(prefix string, ch chan *influxClient.Series) error {
 		return err
 	}
 	defer fi.Close()
-
-	if prefix != "" {
-		prefix += "."
-	}
 
 	serie := &influxClient.Series{
 		Name:    prefix + "disks",
