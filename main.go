@@ -109,12 +109,12 @@ func main() {
 			case "disks":
 				collectList = append(collectList, disks)
 			default:
-				fmt.Fprintf("Unknown collect option `%s'", c)
+				fmt.Fprintf(os.Stderr, "Unknown collect option `%s'", c)
 				return
 			}
 		}
 
-		if prefixFlag != "" && prefixFlag[len(prefixFlag) - 1] != "." {
+		if prefixFlag != "" && prefixFlag[len(prefixFlag) - 1] != '.' {
 			prefixFlag += "."
 		}
 
@@ -200,7 +200,7 @@ func send(client *influxClient.Client, series []*influxClient.Series) error {
 
 var last_series = make(map[string] [][]interface{})
 
-func diff_from_last(serie *influxClient.Series) *influxClient.Series {
+func DiffFromLast(serie *influxClient.Series) *influxClient.Series {
 	notComplete := false
 
 	if _, ok := last_series[serie.Name]; ! ok {
@@ -281,7 +281,7 @@ func cpus(prefix string, ch chan *influxClient.Series) error {
 		serie.Points = append(serie.Points, []interface{}{fmt.Sprint("cpu", i), cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
 	}
 
-	ch <- diff_from_last(serie)
+	ch <- DiffFromLast(serie)
 	return nil;
 }
 
@@ -410,7 +410,7 @@ func network(prefix string, ch chan *influxClient.Series) error {
 		serie.Points = append(serie.Points, points)
 	}
 
-	ch <- diff_from_last(serie)
+	ch <- DiffFromLast(serie)
 	return nil
 }
 
@@ -453,6 +453,6 @@ func disks(prefix string, ch chan *influxClient.Series) error {
 		serie.Points = append(serie.Points, points)
 	}
 
-	ch <- diff_from_last(serie)
+	ch <- DiffFromLast(serie)
 	return nil
 }
