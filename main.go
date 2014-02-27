@@ -90,7 +90,7 @@ func main() {
 			}
 		}
 
-		// Build collect functions
+		// Build collect list
 		var collectList []GatherFunc
 		for _, c := range strings.Split(collectFlag, ",") {
 			switch(strings.Trim(c, " ")) {
@@ -108,6 +108,9 @@ func main() {
 				collectList = append(collectList, network)
 			case "disks":
 				collectList = append(collectList, disks)
+			default:
+				fmt.Fprintf("Unknown collect option `%s'", c)
+				return
 			}
 		}
 
