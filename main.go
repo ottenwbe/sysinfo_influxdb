@@ -11,6 +11,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -25,7 +26,7 @@ const APP_VERSION = "0.1.0"
 
 
 // Variables storing arguments flags
-var verboseFlag bool
+var verboseFlag string
 var versionFlag bool
 var daemonFlag bool
 var daemonIntervalFlag time.Duration
@@ -41,8 +42,8 @@ func init() {
 	flag.BoolVar(&versionFlag, "version", false, "Print the version number and exit.")
 	flag.BoolVar(&versionFlag, "V", false, "Print the version number and exit (shorthand).")
 
-	flag.BoolVar(&verboseFlag, "verbose", false, "Display debug information.")
-	flag.BoolVar(&verboseFlag, "v", false, "Display debug information (shorthand).")
+	flag.StringVar(&verboseFlag, "verbose", "", "Display debug information: choose between text or JSON.")
+	flag.StringVar(&verboseFlag, "v", "", "Display debug information: choose between text or JSON (shorthand).")
 
 	hostname, _ := os.Hostname();
 	flag.StringVar(&prefixFlag, "prefix", hostname, "Change series name prefix.")
@@ -147,8 +148,13 @@ func main() {
 			}
 
 			// Show data
-			if (databaseFlag == "" && !first) || verboseFlag {
-				prettyPrinter(data)
+			if !first && (databaseFlag == "" || verboseFlag != "") {
+				if strings.ToLower(verboseFlag) == "text" || verboseFlag == "" {
+					prettyPrinter(data)
+				} else {
+					b, _ := json.Marshal(data)
+					fmt.Printf("%s\n", b)
+				}
 			}
 			// Send data
 			if client != nil && !first {
