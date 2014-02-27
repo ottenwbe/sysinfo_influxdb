@@ -110,7 +110,7 @@ func main() {
 			case "disks":
 				collectList = append(collectList, disks)
 			default:
-				fmt.Fprintf(os.Stderr, "Unknown collect option `%s'", c)
+				fmt.Fprintf(os.Stderr, "Unknown collect option `%s'\n", c)
 				return
 			}
 		}
