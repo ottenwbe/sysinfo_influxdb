@@ -120,12 +120,11 @@ func main() {
 
 		ch := make(chan *influxClient.Series, len(collectList))
 
+		// Without daemon mode, do at least one lap
 		first := true
 
 		for first || daemonFlag {
-			if first {
-				first = false
-			}
+			first = false
 
 			// Collect data
 			var data []*influxClient.Series;
@@ -138,8 +137,11 @@ func main() {
 				res := <-ch
 				if res != nil {
 					data = append(data, res)
-				} else {
-					// Loop if we haven't all data
+				} else if ! daemonFlag {
+					// Loop if we haven't all data:
+					// Since diffed data didn't respond the
+					// first time they are collected, loop
+					// one more time to have it
 					first = true
 				}
 			}
