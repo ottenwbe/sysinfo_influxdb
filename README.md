@@ -2,15 +2,9 @@
 
 A collecting tool of system metrics (CPU, Memory, Load, disks I/Os, Network traffic) to an [InfluxDB](http://influxdb.org) server.
 
-## Building
+## Release
 
-	cd $GOPATH
-	mkdir -p src/github.com/novaquark/
-	cd src/github.com/novaquark/
-	git clone https://github.com/novaquark/sysinfo_influxdb.git
-	cd sysinfo_influxdb
-	go get
-	go install
+You can download the lastest version for [GNU/Linux amd64 here](https://github.com/novaquark/sysinfo_influxdb/releases/download/0.2.0/sysinfo_influxdb).
 
 ## Usage sample
 
@@ -144,6 +138,16 @@ On hardened kernel, you must be allowed to read `/proc/net/dev` in order to coll
 #### JSON
 
 	[{"name":"koala.disks","columns":["device","read_ios","read_merges","read_sectors","read_ticks","write_ios","write_merges","write_sectors","write_ticks","in_flight","io_ticks","time_in_queue"],"points":[["sda",0,0,0,0,0,0,0,0,0,0,0],["sda1",0,0,0,0,0,0,0,0,0,0,0],["sda2",0,0,0,0,0,0,0,0,0,0,0]]}]
+
+## Building
+
+	cd $GOPATH
+	mkdir -p src/github.com/novaquark/
+	cd src/github.com/novaquark/
+	git clone https://github.com/novaquark/sysinfo_influxdb.git
+	cd sysinfo_influxdb
+	go get
+	go install
 
 <p xmlns:dct="http://purl.org/dc/terms/">
   <a rel="license"
