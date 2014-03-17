@@ -158,7 +158,7 @@ func main() {
             // Send data
             if client != nil && !first {
                 if err := send(client, data); err != nil {
-                    panic(err)
+                    fmt.Fprintf(os.Stderr, "%s\n", err)
                 }
             }
 
