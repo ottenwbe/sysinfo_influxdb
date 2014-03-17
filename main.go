@@ -16,6 +16,7 @@ import (
     "fmt"
     "github.com/cloudfoundry/gosigar"
     influxClient "github.com/influxdb/influxdb-go"
+    "io/ioutil"
     "os"
     "strconv"
     "strings"
@@ -31,6 +32,7 @@ var daemonFlag bool
 var daemonIntervalFlag time.Duration
 var prefixFlag string
 var collectFlag string
+var pidFile string
 
 var hostFlag string
 var usernameFlag string
@@ -64,6 +66,8 @@ func init() {
     flag.BoolVar(&daemonFlag, "D", false, "Run in daemon mode (shorthand).")
     flag.DurationVar(&daemonIntervalFlag, "interval", time.Second, "With daemon mode, change time between checks.")
     flag.DurationVar(&daemonIntervalFlag, "i", time.Second, "With daemon mode, change time between checks (shorthand).")
+
+    flag.StringVar(&pidFile, "pidfile", "", "the pid file")
 }
 
 func main() {
@@ -72,6 +76,13 @@ func main() {
     if versionFlag {
         fmt.Println("Version:", APP_VERSION)
     } else {
+	if pidFile != "" {
+	    pid := strconv.Itoa(os.Getpid())
+	    if err := ioutil.WriteFile(pidFile, []byte(pid), 0644); err != nil {
+		panic(err)
+	    }
+	}
+
         // Fill InfluxDB connection settings
         var client *influxClient.Client = nil
         if databaseFlag != "" {
