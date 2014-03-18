@@ -79,6 +79,7 @@ func main() {
 	if pidFile != "" {
 	    pid := strconv.Itoa(os.Getpid())
 	    if err := ioutil.WriteFile(pidFile, []byte(pid), 0644); err != nil {
+                fmt.Fprintf(os.Stderr, "Unable to create pidfile\n")
 		panic(err)
 	    }
 	}
