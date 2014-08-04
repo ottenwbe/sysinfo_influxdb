@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 	"github.com/cloudfoundry/gosigar"
-	influxClient "github.com/influxdb/influxdb-go"
+	influxClient "github.com/influxdb/influxdb/client"
 )
 
 const APP_VERSION = "0.2.0"
