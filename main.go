@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ const APP_VERSION = "0.2.0"
 var verboseFlag string
 var versionFlag bool
 var daemonFlag bool
+var fqdnFlag bool
 var daemonIntervalFlag time.Duration
 var prefixFlag string
 var collectFlag string
@@ -49,6 +51,9 @@ func init() {
 	flag.StringVar(&prefixFlag, "prefix", hostname, "Change series name prefix.")
 	flag.StringVar(&prefixFlag, "P", hostname, "Change series name prefix (shorthand).")
 
+	flag.BoolVar(&fqdnFlag, "fqdn", false, "Append fqdn with every data")
+	flag.BoolVar(&fqdnFlag, "f", false, "Append fqdn with every data (shorthand).")
+
 	flag.StringVar(&hostFlag, "host", "localhost:8086", "Connect to host.")
 	flag.StringVar(&hostFlag, "h", "localhost:8086", "Connect to host (shorthand).")
 	flag.StringVar(&usernameFlag, "username", "root", "User for login.")
@@ -67,128 +72,151 @@ func init() {
 	flag.DurationVar(&daemonIntervalFlag, "i", time.Second, "With daemon mode, change time between checks (shorthand).")
 }
 
+func getFqdn() string {
+  // Note: We use exec here instead of os.Hostname() because we
+  // want the FQDN, and this is the easiest way to get it.
+  fqdn, err := exec.Command("hostname", "-f").Output()
+
+  // Fallback on Unqualifed name
+  if err != nil {
+    hostname, _ := os.Hostname()
+    return hostname
+  }
+
+  return strings.TrimSpace(string(fqdn))
+}
+
 func main() {
-	flag.Parse() // Scan the arguments list
+  flag.Parse() // Scan the arguments list
 
-	if versionFlag {
-		fmt.Println("Version:", APP_VERSION)
-	} else {
-		// Fill InfluxDB connection settings
-		var client *influxClient.Client = nil;
-		if databaseFlag != "" {
-			config := new(influxClient.ClientConfig)
+  if versionFlag {
+    fmt.Println("Version:", APP_VERSION)
+  } else {
+    // Fill InfluxDB connection settings
+    var client *influxClient.Client = nil;
+    if databaseFlag != "" {
+      config := new(influxClient.ClientConfig)
 
-			config.Host = hostFlag
-			config.Username = usernameFlag
-			config.Password = passwordFlag
-			config.Database = databaseFlag
+      config.Host = hostFlag
+      config.Username = usernameFlag
+      config.Password = passwordFlag
+      config.Database = databaseFlag
 
-			var err error
-			client, err = influxClient.NewClient(config)
+      var err error
+      client, err = influxClient.NewClient(config)
 
-			if err != nil {
-				panic(err)
-			}
-		}
+      if err != nil {
+        panic(err)
+      }
+    }
 
-		// Build collect list
-		var collectList []GatherFunc
-		for _, c := range strings.Split(collectFlag, ",") {
-			switch(strings.Trim(c, " ")) {
-			case "cpus":
-				collectList = append(collectList, cpus)
-			case "mem":
-				collectList = append(collectList, mem)
-			case "swap":
-				collectList = append(collectList, swap)
-			case "uptime":
-				collectList = append(collectList, uptime)
-			case "load":
-				collectList = append(collectList, load)
-			case "network":
-				collectList = append(collectList, network)
-			case "disks":
-				collectList = append(collectList, disks)
-			default:
-				fmt.Fprintf(os.Stderr, "Unknown collect option `%s'\n", c)
-				return
-			}
-		}
+    // Build collect list
+    var collectList []GatherFunc
+    for _, c := range strings.Split(collectFlag, ",") {
+      switch(strings.Trim(c, " ")) {
+      case "cpus":
+        collectList = append(collectList, cpus)
+      case "mem":
+        collectList = append(collectList, mem)
+      case "swap":
+        collectList = append(collectList, swap)
+      case "uptime":
+        collectList = append(collectList, uptime)
+      case "load":
+        collectList = append(collectList, load)
+      case "network":
+        collectList = append(collectList, network)
+      case "disks":
+        collectList = append(collectList, disks)
+      default:
+        fmt.Fprintf(os.Stderr, "Unknown collect option `%s'\n", c)
+        return
+      }
+    }
 
-		if prefixFlag != "" && prefixFlag[len(prefixFlag) - 1] != '.' {
-			prefixFlag += "."
-		}
+    if prefixFlag != "" && prefixFlag[len(prefixFlag) - 1] != '.' {
+      prefixFlag += "."
+    }
 
-		ch := make(chan *influxClient.Series, len(collectList))
+    ch := make(chan *influxClient.Series, len(collectList))
 
-		// Without daemon mode, do at least one lap
-		first := true
+    // Without daemon mode, do at least one lap
+    first := true
 
-		for first || daemonFlag {
-			first = false
+    for first || daemonFlag {
+      first = false
 
-			// Collect data
-			var data []*influxClient.Series;
+      // Collect data
+      var data []*influxClient.Series;
 
-			for _, cl := range collectList {
-				go cl(prefixFlag, ch)
-			}
+      for _, cl := range collectList {
+        go cl(prefixFlag, ch)
+      }
 
-			for i := len(collectList); i > 0; i-- {
-				res := <-ch
-				if res != nil {
-					data = append(data, res)
-				} else if ! daemonFlag {
-					// Loop if we haven't all data:
-					// Since diffed data didn't respond the
-					// first time they are collected, loop
-					// one more time to have it
-					first = true
-				}
-			}
+      for i := len(collectList); i > 0; i-- {
+        res := <-ch
+        if res != nil {
+          data = append(data, res)
+        } else if ! daemonFlag {
+          // Loop if we haven't all data:
+          // Since diffed data didn't respond the
+          // first time they are collected, loop
+          // one more time to have it
+          first = true
+        }
+      }
 
-			// Show data
-			if !first && (databaseFlag == "" || verboseFlag != "") {
-				if strings.ToLower(verboseFlag) == "text" || verboseFlag == "" {
-					prettyPrinter(data)
-				} else {
-					b, _ := json.Marshal(data)
-					fmt.Printf("%s\n", b)
-				}
-			}
-			// Send data
-			if client != nil && !first {
-				if err := send(client, data); err != nil {
-					panic(err)
-				}
-			}
+      if !first && fqdnFlag {
+        for _, serie := range data {
+          serie.Columns = append(serie.Columns, "fqdn")
+          for kv, value := range serie.Points {
+            serie.Points[kv] = append(value, getFqdn())
+          }
+        }
+      }
 
-			if daemonFlag || first {
-				time.Sleep(daemonIntervalFlag)
-			}
-		}
-	}
+      // Show data
+      if !first && (databaseFlag == "" || verboseFlag != "") {
+        if strings.ToLower(verboseFlag) == "text" || verboseFlag == "" {
+          prettyPrinter(data)
+        } else {
+          b, _ := json.Marshal(data)
+          fmt.Printf("%s\n", b)
+        }
+      }
+      // Send data
+      if client != nil && !first {
+        if err := send(client, data); err != nil {
+          panic(err)
+        }
+      }
+
+      if daemonFlag || first {
+        time.Sleep(daemonIntervalFlag)
+      }
+    }
+  }
 }
 
 func prettyPrinter(series []*influxClient.Series) {
-	for ks, serie := range series {
-		nbCols := len(serie.Columns)
+  for ks, serie := range series {
+    nbCols := len(serie.Columns)
 
-		fmt.Printf("\n#%d: %s\n", ks, serie.Name)
+    fmt.Printf("\n#%d: %s\n", ks, serie.Name)
 
-		for _, col := range serie.Columns {
-			fmt.Printf("| %s\t", col)
-		}
-		fmt.Println("|")
+    for _, col := range serie.Columns {
+      fmt.Printf("| %s\t", col)
+    }
+    fmt.Println("|")
 
-		for _, value := range serie.Points {
-			fmt.Print("| ")
-			for i := 0; i < nbCols; i++ {
-				fmt.Print(value[i], "\t| ")
-			}
-			fmt.Print("\n")
-		}
-	}
+    for _, value := range serie.Points {
+      fmt.Print("| ")
+      for i := 0; i < nbCols; i++ {
+        fmt.Print(value[i], "\t| ")
+      }
+      fmt.Print("\n")
+    }
+  }
 }
 
 /**
@@ -196,7 +224,7 @@ func prettyPrinter(series []*influxClient.Series) {
  */
 
 func send(client *influxClient.Client, series []*influxClient.Series) error {
-	return client.WriteSeries(series)
+  return client.WriteSeries(series)
 }
 
 
@@ -207,57 +235,57 @@ func send(client *influxClient.Client, series []*influxClient.Series) error {
 var last_series = make(map[string] [][]interface{})
 
 func DiffFromLast(serie *influxClient.Series) *influxClient.Series {
-	notComplete := false
+  notComplete := false
 
-	if _, ok := last_series[serie.Name]; ! ok {
-		last_series[serie.Name] = [][]interface{}{}
-	}
+  if _, ok := last_series[serie.Name]; ! ok {
+    last_series[serie.Name] = [][]interface{}{}
+  }
 
-	for i := 0; i < len(serie.Points) ; i++ {
-		if len(last_series[serie.Name]) <= i {
-			last_series[serie.Name] = append(last_series[serie.Name], []interface{}{})
-		}
-		for j := 0; j < len(serie.Points[i]) ; j++ {
-			var tmp interface{}
-			if len(last_series[serie.Name][i]) <= j {
-				tmp = serie.Points[i][j]
-				notComplete = true
-				last_series[serie.Name][i] = append(last_series[serie.Name][i], serie.Points[i][j])
-			} else {
-				tmp = last_series[serie.Name][i][j]
-				last_series[serie.Name][i][j] = serie.Points[i][j]
-			}
+  for i := 0; i < len(serie.Points) ; i++ {
+    if len(last_series[serie.Name]) <= i {
+      last_series[serie.Name] = append(last_series[serie.Name], []interface{}{})
+    }
+    for j := 0; j < len(serie.Points[i]) ; j++ {
+      var tmp interface{}
+      if len(last_series[serie.Name][i]) <= j {
+        tmp = serie.Points[i][j]
+        notComplete = true
+        last_series[serie.Name][i] = append(last_series[serie.Name][i], serie.Points[i][j])
+      } else {
+        tmp = last_series[serie.Name][i][j]
+        last_series[serie.Name][i][j] = serie.Points[i][j]
+      }
 
-			switch serie.Points[i][j].(type) {
-			case int8:
-				serie.Points[i][j] = serie.Points[i][j].(int8) - tmp.(int8)
-			case int16:
-				serie.Points[i][j] = serie.Points[i][j].(int16) - tmp.(int16)
-			case int32:
-				serie.Points[i][j] = serie.Points[i][j].(int32) - tmp.(int32)
-			case int64:
-				serie.Points[i][j] = serie.Points[i][j].(int64) - tmp.(int64)
-			case uint8:
-				serie.Points[i][j] = serie.Points[i][j].(uint8) - tmp.(uint8)
-			case uint16:
-				serie.Points[i][j] = serie.Points[i][j].(uint16) - tmp.(uint16)
-			case uint32:
-				serie.Points[i][j] = serie.Points[i][j].(uint32) - tmp.(uint32)
-			case uint64:
-				serie.Points[i][j] = serie.Points[i][j].(uint64) - tmp.(uint64)
-			case int:
-				serie.Points[i][j] = serie.Points[i][j].(int) - tmp.(int)
-			case uint:
-				serie.Points[i][j] = serie.Points[i][j].(uint) - tmp.(uint)
-			}
-		}
-	}
+      switch serie.Points[i][j].(type) {
+      case int8:
+        serie.Points[i][j] = serie.Points[i][j].(int8) - tmp.(int8)
+      case int16:
+        serie.Points[i][j] = serie.Points[i][j].(int16) - tmp.(int16)
+      case int32:
+        serie.Points[i][j] = serie.Points[i][j].(int32) - tmp.(int32)
+      case int64:
+        serie.Points[i][j] = serie.Points[i][j].(int64) - tmp.(int64)
+      case uint8:
+        serie.Points[i][j] = serie.Points[i][j].(uint8) - tmp.(uint8)
+      case uint16:
+        serie.Points[i][j] = serie.Points[i][j].(uint16) - tmp.(uint16)
+      case uint32:
+        serie.Points[i][j] = serie.Points[i][j].(uint32) - tmp.(uint32)
+      case uint64:
+        serie.Points[i][j] = serie.Points[i][j].(uint64) - tmp.(uint64)
+      case int:
+        serie.Points[i][j] = serie.Points[i][j].(int) - tmp.(int)
+      case uint:
+        serie.Points[i][j] = serie.Points[i][j].(uint) - tmp.(uint)
+      }
+    }
+  }
 
-	if notComplete {
-		return nil
-	} else {
-		return serie
-	}
+  if notComplete {
+    return nil
+  } else {
+    return serie
+  }
 }
 
 
@@ -268,197 +296,197 @@ func DiffFromLast(serie *influxClient.Series) *influxClient.Series {
 type GatherFunc func(string, chan *influxClient.Series) error
 
 func cpus(prefix string, ch chan *influxClient.Series) error {
-	serie := &influxClient.Series{
-		Name:    prefix + "cpu",
-		Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
-		Points:  [][]interface{}{},
-	}
+  serie := &influxClient.Series{
+    Name:    prefix + "cpu",
+    Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
+    Points:  [][]interface{}{},
+  }
 
-	cpu := sigar.Cpu{}
-	if err := cpu.Get(); err != nil {
-		ch <- nil
-		return err
-	}
-	serie.Points = append(serie.Points, []interface{}{"cpu", cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
+  cpu := sigar.Cpu{}
+  if err := cpu.Get(); err != nil {
+    ch <- nil
+    return err
+  }
+  serie.Points = append(serie.Points, []interface{}{"cpu", cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
 
-	cpus := sigar.CpuList{}
-	cpus.Get()
-	for i, cpu := range cpus.List {
-		serie.Points = append(serie.Points, []interface{}{fmt.Sprint("cpu", i), cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
-	}
+  cpus := sigar.CpuList{}
+  cpus.Get()
+  for i, cpu := range cpus.List {
+    serie.Points = append(serie.Points, []interface{}{fmt.Sprint("cpu", i), cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
+  }
 
-	ch <- DiffFromLast(serie)
-	return nil;
+  ch <- DiffFromLast(serie)
+  return nil;
 }
 
 func mem(prefix string, ch chan *influxClient.Series) error {
-	serie := &influxClient.Series{
-		Name:    prefix + "mem",
-		Columns: []string{"free", "used", "actualfree", "actualused", "total"},
-		Points:  [][]interface{}{},
-	}
+  serie := &influxClient.Series{
+    Name:    prefix + "mem",
+    Columns: []string{"free", "used", "actualfree", "actualused", "total"},
+    Points:  [][]interface{}{},
+  }
 
-	mem := sigar.Mem{}
-	if err := mem.Get(); err != nil {
-		ch <- nil
-		return err
-	}
-	serie.Points = append(serie.Points, []interface{}{mem.Free, mem.Used, mem.ActualFree, mem.ActualUsed, mem.Total})
+  mem := sigar.Mem{}
+  if err := mem.Get(); err != nil {
+    ch <- nil
+    return err
+  }
+  serie.Points = append(serie.Points, []interface{}{mem.Free, mem.Used, mem.ActualFree, mem.ActualUsed, mem.Total})
 
-	ch <- serie
-	return nil
+  ch <- serie
+  return nil
 }
 
 func swap(prefix string, ch chan *influxClient.Series) error {
-	serie := &influxClient.Series{
-		Name:    prefix + "swap",
-		Columns: []string{"free", "used", "total"},
-		Points:  [][]interface{}{},
-	}
+  serie := &influxClient.Series{
+    Name:    prefix + "swap",
+    Columns: []string{"free", "used", "total"},
+    Points:  [][]interface{}{},
+  }
 
-	swap := sigar.Swap{}
-	if err := swap.Get(); err != nil {
-		ch <- nil
-		return err
-	}
-	serie.Points = append(serie.Points, []interface{}{swap.Free, swap.Used, swap.Total})
+  swap := sigar.Swap{}
+  if err := swap.Get(); err != nil {
+    ch <- nil
+    return err
+  }
+  serie.Points = append(serie.Points, []interface{}{swap.Free, swap.Used, swap.Total})
 
-	ch <- serie
-	return nil
+  ch <- serie
+  return nil
 }
 
 func uptime(prefix string, ch chan *influxClient.Series) error {
-	serie := &influxClient.Series{
-		Name:    prefix + "uptime",
-		Columns: []string{"length"},
-		Points:  [][]interface{}{},
-	}
+  serie := &influxClient.Series{
+    Name:    prefix + "uptime",
+    Columns: []string{"length"},
+    Points:  [][]interface{}{},
+  }
 
-	uptime := sigar.Uptime{}
-	if err := uptime.Get(); err != nil {
-		ch <- nil
-		return err
-	}
-	serie.Points = append(serie.Points, []interface{}{uptime.Length})
+  uptime := sigar.Uptime{}
+  if err := uptime.Get(); err != nil {
+    ch <- nil
+    return err
+  }
+  serie.Points = append(serie.Points, []interface{}{uptime.Length})
 
-	ch <- serie
-	return nil
+  ch <- serie
+  return nil
 }
 
 func load(prefix string, ch chan *influxClient.Series) error {
-	serie := &influxClient.Series{
-		Name:    prefix + "load",
-		Columns: []string{"one", "five", "fifteen"},
-		Points:  [][]interface{}{},
-	}
+  serie := &influxClient.Series{
+    Name:    prefix + "load",
+    Columns: []string{"one", "five", "fifteen"},
+    Points:  [][]interface{}{},
+  }
 
-	load := sigar.LoadAverage{}
-	if err := load.Get(); err != nil {
-		ch <- nil
-		return err
-	}
-	serie.Points = append(serie.Points, []interface{}{load.One, load.Five, load.Fifteen})
+  load := sigar.LoadAverage{}
+  if err := load.Get(); err != nil {
+    ch <- nil
+    return err
+  }
+  serie.Points = append(serie.Points, []interface{}{load.One, load.Five, load.Fifteen})
 
-	ch <- serie
-	return nil
+  ch <- serie
+  return nil
 }
 
 func network(prefix string, ch chan *influxClient.Series) error {
-	fi, err := os.Open("/proc/net/dev")
-	if err != nil {
-		return err
-	}
-	defer fi.Close()
+  fi, err := os.Open("/proc/net/dev")
+  if err != nil {
+    return err
+  }
+  defer fi.Close()
 
-	serie := &influxClient.Series{
-		Name:    prefix + "network",
-		Columns: []string{ "iface",
-			           "recv_bytes", "recv_packets", "recv_errs",
-			           "recv_drop", "recv_fifo", "recv_frame",
-			           "recv_compressed", "recv_multicast",
-			           "trans_bytes", "trans_packets", "trans_errs",
-			           "trans_drop", "trans_fifo", "trans_colls",
-			           "trans_carrier", "trans_compressed" },
-		Points:  [][]interface{}{},
-	}
+  serie := &influxClient.Series{
+    Name:    prefix + "network",
+    Columns: []string{ "iface",
+                 "recv_bytes", "recv_packets", "recv_errs",
+                 "recv_drop", "recv_fifo", "recv_frame",
+                 "recv_compressed", "recv_multicast",
+                 "trans_bytes", "trans_packets", "trans_errs",
+                 "trans_drop", "trans_fifo", "trans_colls",
+                 "trans_carrier", "trans_compressed" },
+    Points:  [][]interface{}{},
+  }
 
-	// Search interface
-	skip := 2
-	scanner := bufio.NewScanner(fi)
-	for scanner.Scan() {
-		// Skip headers
-		if skip > 0 {
-			skip--
-			continue
-		}
+  // Search interface
+  skip := 2
+  scanner := bufio.NewScanner(fi)
+  for scanner.Scan() {
+    // Skip headers
+    if skip > 0 {
+      skip--
+      continue
+    }
 
-		line := scanner.Text()
-		tmp := strings.Split(line, ":")
-		if len(tmp) < 2 {
-			ch <- nil
-			return nil
-		}
+    line := scanner.Text()
+    tmp := strings.Split(line, ":")
+    if len(tmp) < 2 {
+      ch <- nil
+      return nil
+    }
 
-		iface := strings.Trim(tmp[0], " ")
-		tmp = strings.Fields(tmp[1])
+    iface := strings.Trim(tmp[0], " ")
+    tmp = strings.Fields(tmp[1])
 
-		var points []interface{}
-		points = append(points, iface)
+    var points []interface{}
+    points = append(points, iface)
 
-		for i := 0; i < len(serie.Columns) - 1; i++ {
-			if v, err := strconv.Atoi(tmp[i]); err == nil {
-				points = append(points, v)
-			} else {
-				points = append(points, 0)
-			}
-		}
+    for i := 0; i < len(serie.Columns) - 1; i++ {
+      if v, err := strconv.Atoi(tmp[i]); err == nil {
+        points = append(points, v)
+      } else {
+        points = append(points, 0)
+      }
+    }
 
-		serie.Points = append(serie.Points, points)
-	}
+    serie.Points = append(serie.Points, points)
+  }
 
-	ch <- DiffFromLast(serie)
-	return nil
+  ch <- DiffFromLast(serie)
+  return nil
 }
 
 func disks(prefix string, ch chan *influxClient.Series) error {
-	fi, err := os.Open("/proc/diskstats")
-	if err != nil {
-		return err
-	}
-	defer fi.Close()
+  fi, err := os.Open("/proc/diskstats")
+  if err != nil {
+    return err
+  }
+  defer fi.Close()
 
-	serie := &influxClient.Series{
-		Name:    prefix + "disks",
-		Columns: []string{ "device",
-			           "read_ios", "read_merges", "read_sectors", "read_ticks",
-			           "write_ios", "write_merges", "write_sectors", "write_ticks",
-			           "in_flight", "io_ticks", "time_in_queue" },
-		Points:  [][]interface{}{},
-	}
+  serie := &influxClient.Series{
+    Name:    prefix + "disks",
+    Columns: []string{ "device",
+                 "read_ios", "read_merges", "read_sectors", "read_ticks",
+                 "write_ios", "write_merges", "write_sectors", "write_ticks",
+                 "in_flight", "io_ticks", "time_in_queue" },
+    Points:  [][]interface{}{},
+  }
 
-	// Search device
-	scanner := bufio.NewScanner(fi)
-	for scanner.Scan() {
-		tmp := strings.Fields(scanner.Text())
-		if len(tmp) < 14 {
-			ch <- nil
-			return nil
-		}
+  // Search device
+  scanner := bufio.NewScanner(fi)
+  for scanner.Scan() {
+    tmp := strings.Fields(scanner.Text())
+    if len(tmp) < 14 {
+      ch <- nil
+      return nil
+    }
 
-		var points []interface{}
-		points = append(points, tmp[2])
+    var points []interface{}
+    points = append(points, tmp[2])
 
-		for i := 0; i < len(serie.Columns) - 1; i++ {
-			if v, err := strconv.Atoi(tmp[3 + i]); err == nil {
-				points = append(points, v)
-			} else {
-				points = append(points, 0)
-			}
-		}
+    for i := 0; i < len(serie.Columns) - 1; i++ {
+      if v, err := strconv.Atoi(tmp[3 + i]); err == nil {
+        points = append(points, v)
+      } else {
+        points = append(points, 0)
+      }
+    }
 
-		serie.Points = append(serie.Points, points)
-	}
+    serie.Points = append(serie.Points, points)
+  }
 
-	ch <- DiffFromLast(serie)
-	return nil
+  ch <- DiffFromLast(serie)
+  return nil
 }
