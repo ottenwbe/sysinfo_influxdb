@@ -22,7 +22,7 @@ import (
 	influxClient "github.com/influxdb/influxdb/client"
 )
 
-const APP_VERSION = "0.2.0"
+const APP_VERSION = "0.2.1"
 
 
 // Variables storing arguments flags
