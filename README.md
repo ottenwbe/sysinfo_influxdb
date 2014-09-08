@@ -4,7 +4,7 @@ A collecting tool of system metrics (CPU, Memory, Load, disks I/Os, Network traf
 
 ## Release
 
-You can download the lastest version for [GNU/Linux amd64 here](https://github.com/novaquark/sysinfo_influxdb/releases/download/0.2.1/sysinfo_influxdb).
+You can download the lastest version for [GNU/Linux amd64 here](https://github.com/novaquark/sysinfo_influxdb/releases/download/0.3.0/sysinfo_influxdb).
 
 ## Usage sample
 
