@@ -23,6 +23,10 @@ By default, table are prefixed by the hostname, to change or disable the prefix,
     $GOPATH/bin/sysinfo_influxdb -P "" # Disable prefix
     $GOPATH/bin/sysinfo_influxdb -P "koala"
 
+To append FQDN of the running host at the end of injected data, use the `--fqdn` flag :
+
+    $GOPATH/bin/sysinfo_influxdb --fqdn
+
 To run in daemon mode (doesn't fork, just loop), use the `-D` option :
 
     $GOPATH/bin/sysinfo_influxdb -D
