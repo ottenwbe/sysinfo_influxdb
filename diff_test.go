@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-	influxClient "github.com/influxdb/influxdb-go"
+	influxClient "github.com/influxdb/influxdb/client"
 )
 
 func TestSimple(t *testing.T) {
