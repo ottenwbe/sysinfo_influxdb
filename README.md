@@ -39,22 +39,33 @@ Use the `-i` option to change the collect interval; this option alters the consi
 
     $GOPATH/bin/sysinfo_influxdb -i 1m
 
-To change data collected, use the `-c` option with one or more metrics type (`cpus`, `mem`, `swap`, `uptime`, `load`, `network`, `disks`) like this :
+To change data collected, use the `-c` option with one or more metrics type (`cpu`, `cpus`, `mem`, `swap`, `uptime`, `load`, `network`, `disks`) like this :
 
-    $GOPATH/bin/sysinfo_influxdb -c cpus # Collect only CPUs related statistics
-    $GOPATH/bin/sysinfo_influxdb -c load,cpus,disks # Collect load average, CPUs and disks I/Os statistics
+    $GOPATH/bin/sysinfo_influxdb -c cpus # Collect only CPUs related statistics by CPU core
+    $GOPATH/bin/sysinfo_influxdb -c load,cpu,disks # Collect load average, global CPU and disks I/Os statistics
 
 On hardened kernel, you must be allowed to read `/proc/net/dev` in order to collect networking statistics.
 
 ## Output format
 
+### CPU
+
+#### Text
+
+  #0: koala.cpu
+  | id  | user  | nice  | sys | idle  | wait  | total |
+  | cpu | 4 | 4 | 2 | 794 | 3 | 807 |
+
+#### JSON
+
+  [{"name":"koala.cpu","columns":["id","user","nice","sys","idle","wait","total"],"points":[["cpu",3,0,1,795,0,799]]}]
+
 ### CPUs
 
 #### Text
 
-	#0: koala.cpu
+	#0: koala.cpus
 	| id	| user	| nice	| sys	| idle	| wait	| total	|
-	| cpu	| 4	| 4	| 2	| 794	| 3	| 807	|
 	| cpu0	| 1	| 1	| 1	| 95	| 2	| 100	|
 	| cpu1	| 1	| 0	| 1	| 99	| 0	| 101	|
 	| cpu2	| 1	| 0	| 0	| 99	| 0	| 100	|
@@ -62,7 +73,7 @@ On hardened kernel, you must be allowed to read `/proc/net/dev` in order to coll
 
 #### JSON
 
-	[{"name":"koala.cpu","columns":["id","user","nice","sys","idle","wait","total"],"points":[["cpu",3,0,1,795,0,799],["cpu0",0,0,0,99,0,99],["cpu1",0,0,1,99,0,100],["cpu2",1,0,0,99,0,100],["cpu3",1,0,1,98,0,100]]}]
+	[{"name":"koala.cpus","columns":["id","user","nice","sys","idle","wait","total"],"points":[["cpu0",0,0,0,99,0,99],["cpu1",0,0,1,99,0,100],["cpu2",1,0,0,99,0,100],["cpu3",1,0,1,98,0,100]]}]
 
 ### Memory
 

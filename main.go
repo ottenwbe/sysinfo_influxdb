@@ -14,14 +14,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/cloudfoundry/gosigar"
+	influxClient "github.com/influxdb/influxdb/client"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
-	"github.com/cloudfoundry/gosigar"
-	influxClient "github.com/influxdb/influxdb/client"
 )
 
 const APP_VERSION = "0.3.0"
@@ -64,8 +64,8 @@ func init() {
 	flag.StringVar(&databaseFlag, "database", "", "Name of the database to use.")
 	flag.StringVar(&databaseFlag, "d", "", "Name of the database to use (shorthand).")
 
-	flag.StringVar(&collectFlag, "collect", "cpus,mem,swap,uptime,load,network,disks", "Chose which data to collect.")
-	flag.StringVar(&collectFlag, "c", "cpus,mem,swap,uptime,load,network,disks", "Chose which data to collect (shorthand).")
+	flag.StringVar(&collectFlag, "collect", "cpu,cpus,mem,swap,uptime,load,network,disks", "Chose which data to collect.")
+	flag.StringVar(&collectFlag, "c", "cpu,cpus,mem,swap,uptime,load,network,disks", "Chose which data to collect (shorthand).")
 
 	flag.BoolVar(&daemonFlag, "daemon", false, "Run in daemon mode.")
 	flag.BoolVar(&daemonFlag, "D", false, "Run in daemon mode (shorthand).")
@@ -125,6 +125,8 @@ func main() {
 		var collectList []GatherFunc
 		for _, c := range strings.Split(collectFlag, ",") {
 			switch strings.Trim(c, " ") {
+			case "cpu":
+				collectList = append(collectList, cpu)
 			case "cpus":
 				collectList = append(collectList, cpus)
 			case "mem":
@@ -307,7 +309,7 @@ func DiffFromLast(serie *influxClient.Series) *influxClient.Series {
 
 type GatherFunc func(string, chan *influxClient.Series) error
 
-func cpus(prefix string, ch chan *influxClient.Series) error {
+func cpu(prefix string, ch chan *influxClient.Series) error {
 	serie := &influxClient.Series{
 		Name:    prefix + "cpu",
 		Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
@@ -320,6 +322,17 @@ func cpus(prefix string, ch chan *influxClient.Series) error {
 		return err
 	}
 	serie.Points = append(serie.Points, []interface{}{"cpu", cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
+
+	ch <- DiffFromLast(serie)
+	return nil
+}
+
+func cpus(prefix string, ch chan *influxClient.Series) error {
+	serie := &influxClient.Series{
+		Name:    prefix + "cpus",
+		Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
+		Points:  [][]interface{}{},
+	}
 
 	cpus := sigar.CpuList{}
 	cpus.Get()
