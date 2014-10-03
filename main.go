@@ -39,6 +39,7 @@ var pidFile string
 var hostFlag string
 var usernameFlag string
 var passwordFlag string
+var secretFlag string
 var databaseFlag string
 
 func init() {
@@ -61,6 +62,8 @@ func init() {
 	flag.StringVar(&usernameFlag, "u", "root", "User for login (shorthand).")
 	flag.StringVar(&passwordFlag, "password", "root", "Password to use when connecting to server.")
 	flag.StringVar(&passwordFlag, "p", "root", "Password to use when connecting to server (shorthand).")
+	flag.StringVar(&secretFlag, "secret", "", "Absolute path to password file (shorthand). '-p' is ignored if specifed.")
+	flag.StringVar(&secretFlag, "s", "", "Absolute path to password file. '-p' is ignored if specifed.")
 	flag.StringVar(&databaseFlag, "database", "", "Name of the database to use.")
 	flag.StringVar(&databaseFlag, "d", "", "Name of the database to use (shorthand).")
 
@@ -110,8 +113,18 @@ func main() {
 
 			config.Host = hostFlag
 			config.Username = usernameFlag
-			config.Password = passwordFlag
 			config.Database = databaseFlag
+
+			// use secret file if present, fallback to CLI password arg
+			if secretFlag != "" {
+				data, err := ioutil.ReadFile(secretFlag)
+				if err != nil {
+					panic(err)
+				}
+				config.Password = strings.Split(string(data), "\n")[0]
+			} else {
+				config.Password = passwordFlag
+			}
 
 			var err error
 			client, err = influxClient.NewClient(config)

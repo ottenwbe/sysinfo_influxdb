@@ -16,7 +16,11 @@ To send metric to an InfluxDB server, only one time :
 
     $GOPATH/bin/sysinfo_influxdb -h localhost:8086 -u root -p secret -d database
 
-You can ommit `-h`, `-u` and `-p` if you use default settings.
+Password can also be read from a file if you don't want to specify it in CLI (`-p` is ignored if specified with `-s`) :
+
+    $GOPATH/bin/sysinfo_influxdb -h localhost:8086 -u root -s /etc/sysinfo.secret -d database
+
+You can ommit `-h`, `-u`, `-p` or `-s` if you use default settings.
 
 By default, table are prefixed by the hostname, to change or disable the prefix, just do :
 
