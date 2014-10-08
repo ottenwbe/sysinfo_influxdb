@@ -1,10 +1,12 @@
 # sysinfo_influxdb
 
+[![Gobuild Download](https://img.shields.io/badge/gobuild-download-green.svg?style=flat)](http://gobuild.io/github.com/novaquark/sysinfo_influxdb) [![Build Status](http://img.shields.io/travis/novaquark/sysinfo_influxdb.svg)](https://travis-ci.org/novaquark/sysinfo_influxdb)
+
 A collecting tool of system metrics (CPU, Memory, Load, disks I/Os, Network traffic) to an [InfluxDB](http://influxdb.org) server.
 
 ## Release
 
-You can download the lastest version for [GNU/Linux amd64 here](https://github.com/novaquark/sysinfo_influxdb/releases/download/0.4.0/sysinfo_influxdb).
+You can download the lastest version for [GNU/Linux amd64 here](https://github.com/novaquark/sysinfo_influxdb/releases/download/0.4.1/sysinfo_influxdb).
 
 ## Usage sample
 
@@ -56,13 +58,13 @@ On hardened kernel, you must be allowed to read `/proc/net/dev` in order to coll
 
 #### Text
 
-  #0: koala.cpu
-  | id  | user  | nice  | sys | idle  | wait  | total |
-  | cpu | 4 | 4 | 2 | 794 | 3 | 807 |
+	#0: koala.cpu
+	| id  | user  | nice  | sys | idle  | wait  | total |
+	| cpu | 4 | 4 | 2 | 794 | 3 | 807 |
 
 #### JSON
 
-  [{"name":"koala.cpu","columns":["id","user","nice","sys","idle","wait","total"],"points":[["cpu",3,0,1,795,0,799]]}]
+	[{"name":"koala.cpu","columns":["id","user","nice","sys","idle","wait","total"],"points":[["cpu",3,0,1,795,0,799]]}]
 
 ### CPUs
 
