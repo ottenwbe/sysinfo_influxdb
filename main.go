@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-const APP_VERSION = "0.4.2"
+const APP_VERSION = "0.4.3"
 
 // Variables storing arguments flags
 var verboseFlag string
