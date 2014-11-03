@@ -2,7 +2,7 @@
 
 [![Gobuild Download](https://img.shields.io/badge/gobuild-download-green.svg?style=flat)](http://gobuild.io/github.com/novaquark/sysinfo_influxdb) [![Build Status](http://img.shields.io/travis/novaquark/sysinfo_influxdb.svg)](https://travis-ci.org/novaquark/sysinfo_influxdb)
 
-A collecting tool of system metrics (CPU, Memory, Load, disks I/Os, Network traffic) to an [InfluxDB](http://influxdb.org) server.
+A collecting tool of system metrics (CPU, memory, load, disks I/Os, network traffic) to an [InfluxDB](http://influxdb.org) server.
 
 ## Usage sample
 
@@ -37,7 +37,7 @@ To display data even if you send them to a server, use `-v` :
 
     $GOPATH/bin/sysinfo_influxdb -D -h localhost:8086 -d database -v
 
-Use the `-i` option to change the collect interval; this option alters the consistency of quantities displayed or sent (CPUs, network or disks I/Os) : the amount of outgoing packets in 1 minute is not directly comparable to the same amount outgoing in 1 second when saved in the same table. For example, to collect statistics each minute :
+Use the `-i` option to change the collect interval; this option preserves the consistency of quantities displayed or sent (CPUs, network or disks I/Os) : so you can store in the same table the amount of outgoing packets in 1 minute to the same amount outgoing in 1 second (use `-C` option to alter the consistency factor). For example, to collect statistics each minute :
 
     $GOPATH/bin/sysinfo_influxdb -i 1m
 
@@ -46,7 +46,7 @@ To change data collected, use the `-c` option with one or more metrics type (`cp
     $GOPATH/bin/sysinfo_influxdb -c cpus # Collect only CPUs related statistics by CPU core
     $GOPATH/bin/sysinfo_influxdb -c load,cpu,disks # Collect load average, global CPU and disks I/Os statistics
 
-On hardened kernel, you must be allowed to read `/proc/net/dev` in order to collect networking statistics.
+On Linux hardened kernel, you must be allowed to read `/proc/net/dev` in order to collect networking statistics.
 
 ## Output format
 

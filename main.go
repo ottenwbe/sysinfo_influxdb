@@ -32,6 +32,8 @@ var versionFlag bool
 var daemonFlag bool
 var fqdnFlag bool
 var daemonIntervalFlag time.Duration
+var daemonConsistencyFlag time.Duration
+var consistencyFactor = 1.0
 var prefixFlag string
 var collectFlag string
 var pidFile string
@@ -74,6 +76,8 @@ func init() {
 	flag.BoolVar(&daemonFlag, "D", false, "Run in daemon mode (shorthand).")
 	flag.DurationVar(&daemonIntervalFlag, "interval", time.Second, "With daemon mode, change time between checks.")
 	flag.DurationVar(&daemonIntervalFlag, "i", time.Second, "With daemon mode, change time between checks (shorthand).")
+	flag.DurationVar(&daemonConsistencyFlag, "consistency", time.Second, "With custom interval, duration to bring back collected values for data consistency (0s to disable).")
+	flag.DurationVar(&daemonConsistencyFlag, "C", time.Second, "With daemon mode, duration to bring back collected values for data consistency (shorthand).")
 
 	flag.StringVar(&pidFile, "pidfile", "", "the pid file")
 }
@@ -104,6 +108,10 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Unable to create pidfile\n")
 				panic(err)
 			}
+		}
+
+		if daemonConsistencyFlag.Seconds() > 0 {
+			consistencyFactor = daemonConsistencyFlag.Seconds() / daemonIntervalFlag.Seconds()
 		}
 
 		// Fill InfluxDB connection settings
@@ -286,25 +294,25 @@ func DiffFromLast(serie *influxClient.Series) *influxClient.Series {
 
 			switch serie.Points[i][j].(type) {
 			case int8:
-				serie.Points[i][j] = serie.Points[i][j].(int8) - tmp.(int8)
+				serie.Points[i][j] = int8(float64(serie.Points[i][j].(int8)-tmp.(int8)) * consistencyFactor)
 			case int16:
-				serie.Points[i][j] = serie.Points[i][j].(int16) - tmp.(int16)
+				serie.Points[i][j] = int16(float64(serie.Points[i][j].(int16)-tmp.(int16)) * consistencyFactor)
 			case int32:
-				serie.Points[i][j] = serie.Points[i][j].(int32) - tmp.(int32)
+				serie.Points[i][j] = int32(float64(serie.Points[i][j].(int32)-tmp.(int32)) * consistencyFactor)
 			case int64:
-				serie.Points[i][j] = serie.Points[i][j].(int64) - tmp.(int64)
+				serie.Points[i][j] = int64(float64(serie.Points[i][j].(int64)-tmp.(int64)) * consistencyFactor)
 			case uint8:
-				serie.Points[i][j] = serie.Points[i][j].(uint8) - tmp.(uint8)
+				serie.Points[i][j] = uint8(float64(serie.Points[i][j].(uint8)-tmp.(uint8)) * consistencyFactor)
 			case uint16:
-				serie.Points[i][j] = serie.Points[i][j].(uint16) - tmp.(uint16)
+				serie.Points[i][j] = uint16(float64(serie.Points[i][j].(uint16)-tmp.(uint16)) * consistencyFactor)
 			case uint32:
-				serie.Points[i][j] = serie.Points[i][j].(uint32) - tmp.(uint32)
+				serie.Points[i][j] = uint32(float64(serie.Points[i][j].(uint32)-tmp.(uint32)) * consistencyFactor)
 			case uint64:
-				serie.Points[i][j] = serie.Points[i][j].(uint64) - tmp.(uint64)
+				serie.Points[i][j] = uint64(float64(serie.Points[i][j].(uint64)-tmp.(uint64)) * consistencyFactor)
 			case int:
-				serie.Points[i][j] = serie.Points[i][j].(int) - tmp.(int)
+				serie.Points[i][j] = int(float64(serie.Points[i][j].(int)-tmp.(int)) * consistencyFactor)
 			case uint:
-				serie.Points[i][j] = serie.Points[i][j].(uint) - tmp.(uint)
+				serie.Points[i][j] = uint(float64(serie.Points[i][j].(uint)-tmp.(uint)) * consistencyFactor)
 			}
 		}
 	}

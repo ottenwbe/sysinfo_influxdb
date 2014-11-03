@@ -83,7 +83,7 @@ func fillPoints(serie *influxClient.Series, pts *[][]interface{}, sizeX int, siz
 		*pts = append(*pts, []interface{}{})
 
 		for j := 0; j < sizeY; j++ {
-			tmp := rand.Int()
+			tmp := rand.Intn(9876543210)
 			(*pts)[i] = append((*pts)[i], tmp)
 			if len(serie.Points[i]) <= j {
 				serie.Points[i] = append(serie.Points[i], tmp)
