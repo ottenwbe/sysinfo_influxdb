@@ -169,7 +169,7 @@ On Linux hardened kernel, you must be allowed to read `/proc/net/dev` in order t
 
 #### JSON
 
-    [{"name":"koala.mounts","columns":["mountpoint","disk","free","total"],"points":[["/","/dev/sda2","117969465344","125855354880"],["/home","/dev/sda6","50837757952","242004779008"],["/boot","/dev/sda1","329293824","486123520"]]}]
+    [{"name":"koala.mounts","columns":["mountpoint","disk","free","total"],"points":[["/","/dev/sda2",117969465344,125855354880],["/home","/dev/sda6",50837757952,242004779008],["/boot","/dev/sda1",329293824,486123520]]}]
 
 ## Building
 
