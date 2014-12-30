@@ -1,8 +1,12 @@
 # sysinfo_influxdb
 
-[![Gobuild Download](https://img.shields.io/badge/gobuild-download-green.svg?style=flat)](http://gobuild.io/github.com/novaquark/sysinfo_influxdb) [![Build Status](http://img.shields.io/travis/novaquark/sysinfo_influxdb.svg)](https://travis-ci.org/novaquark/sysinfo_influxdb)
+[![Gobuild Download](https://img.shields.io/badge/gobuild-download-green.svg)](http://gobuild.io/github.com/novaquark/sysinfo_influxdb) [![Build Status](http://img.shields.io/travis/novaquark/sysinfo_influxdb.svg)](https://travis-ci.org/novaquark/sysinfo_influxdb)
 
 A collecting tool of system metrics (CPU, memory, load, disks I/Os, network traffic) to an [InfluxDB](http://influxdb.org) server.
+
+## Release
+
+You can download the lastest version for amd64/x86/arm on [gobuild website](http://gobuild.io/github.com/novaquark/sysinfo_influxdb?tag=branch:master).
 
 ## Usage sample
 
