@@ -453,6 +453,7 @@ func load(prefix string, ch chan *influxClient.Series) error {
 func network(prefix string, ch chan *influxClient.Series) error {
 	fi, err := os.Open("/proc/net/dev")
 	if err != nil {
+	        ch <- nil
 		return err
 	}
 	defer fi.Close()
@@ -510,6 +511,7 @@ func network(prefix string, ch chan *influxClient.Series) error {
 func disks(prefix string, ch chan *influxClient.Series) error {
 	fi, err := os.Open("/proc/diskstats")
 	if err != nil {
+	        ch <- nil
 		return err
 	}
 	defer fi.Close()
@@ -559,6 +561,7 @@ func mounts(prefix string, ch chan *influxClient.Series) error {
 
 	fi, err := os.Open("/proc/mounts")
 	if err != nil {
+	        ch <- nil
 		return err
 	}
 	defer fi.Close()
@@ -576,6 +579,7 @@ func mounts(prefix string, ch chan *influxClient.Series) error {
 
 			err := syscall.Statfs(tmp[1], &fs)
 			if err != nil {
+				ch <- nil
 				return err
 			}
 
