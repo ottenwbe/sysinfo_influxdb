@@ -4,6 +4,8 @@
 
 A collecting tool of system metrics (CPU, memory, load, disks I/Os, network traffic) to an [InfluxDB](http://influxdb.org) server.
 
+This project mainly relies on [gosigar](https://github.com/cloudfoundry/gosigar/), so it's compatible with GNU/Linux and MacOS system, but not with Windows yet.
+
 ## Release
 
 You can download the lastest version for amd64/x86/arm on [gobuild website](http://gobuild.io/github.com/novaquark/sysinfo_influxdb?tag=branch:master).
