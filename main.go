@@ -30,7 +30,7 @@ type chan_ret_t struct {
 	err    error
 }
 
-const APP_VERSION = "0.5.3"
+const APP_VERSION = "0.5.4"
 
 // Variables storing arguments flags
 var verboseFlag string
