@@ -11,16 +11,16 @@ package main
 
 import (
 	"fmt"
+	influxClient "github.com/influxdb/influxdb/client"
 	"math/rand"
 	"testing"
-	influxClient "github.com/influxdb/influxdb/client"
 )
 
 func TestSimple(t *testing.T) {
-	serie1 := &influxClient.Series{
-		Name:    "test_init",
-		Columns: []string{ "col0" },
-		Points:  [][]interface{}{ []interface{}{ 42 } },
+	serie1 := &influxClient.Point{
+		Name:   "test_init",
+		Tags:   map[string]string{"tag0": "val0"},
+		Fields: map[string]interface{}{"col0": 42},
 	}
 
 	if DiffFromLast(serie1) != nil {
@@ -31,100 +31,86 @@ func TestSimple(t *testing.T) {
 		t.Error("DiffFromLast shouldn't modify serie name")
 	}
 
-	if len(serie1.Columns) != 1 {
-		t.Error("DiffFromLast shouldn't modify columns number")
+	if len(serie1.Tags) != 1 {
+		t.Error("DiffFromLast shouldn't modify tag number")
 	}
 
-	if serie1.Columns[0] != "col0" {
-		t.Error("DiffFromLast shouldn't modify columns name")
+	if _, ok := serie1.Tags["tag0"]; !ok {
+		t.Error("DiffFromLast shouldn't modify tag name")
 	}
 
-	serie2 := &influxClient.Series{
-		Name:    "test_init_other",
-		Columns: []string{ "col0", "col1" },
-		Points:  [][]interface{}{ []interface{}{ 23, 22 }, []interface{}{ 33, 32 } },
+	if v := serie1.Tags["tag0"]; v != "val0" {
+		t.Error("DiffFromLast shouldn't modify tag value")
+	}
+
+	serie2 := &influxClient.Point{
+		Name:   "test_init_other",
+		Tags:   map[string]string{"tag0": "val0", "tag1": "val1"},
+		Fields: map[string]interface{}{"col1": 22, "col0": 23},
 	}
 
 	if DiffFromLast(serie2) != nil {
-		t.Error("Another serie (different serie name) have to be initialized too")
+		t.Error("Another serie (different serie name and tags) have to be initialized too")
 	}
 
-	serie1.Points = [][]interface{}{ []interface{}{ 23 } }
-	serie2.Points = [][]interface{}{ []interface{}{ 43, 42 }, []interface{}{ 32, 33 } }
+	serie1.Fields = map[string]interface{}{"col0": 23}
+	serie2.Fields = map[string]interface{}{"col0": 43, "col1": 42}
 
 	if DiffFromLast(serie1) == nil || DiffFromLast(serie2) == nil {
 		t.Error("Initialized diff serie shouldn't return nil")
 	}
 
-	if serie1.Points[0][0] != 23 - 42 {
-		t.Error("Bad diff:", serie1.Points[0][0], "!= 23 - 42")
+	if serie1.Fields["col0"] != 23-42 {
+		t.Error("Bad diff:", serie1.Fields["col0"], "!= 23 - 42")
 	}
 
-	if serie2.Points[0][0] != 43 - 23 {
-		t.Error("Bad diff:", serie2.Points[0][0], "!= 43 - 23")
+	if serie2.Fields["col0"] != 43-23 {
+		t.Error("Bad diff:", serie2.Fields["col0"], "!= 43 - 23")
 	}
-	if serie2.Points[0][1] != 42 - 22 {
-		t.Error("Bad diff:", serie2.Points[0][1], "!= 42 - 22")
-	}
-	if serie2.Points[1][0] != 32 - 33 {
-		t.Error("Bad diff:", serie2.Points[1][0], "!= 32 - 33")
-	}
-	if serie2.Points[1][1] != 33 - 32 {
-		t.Error("Bad diff:", serie2.Points[1][1], "!= 33 - 32")
+	if serie2.Fields["col1"] != 42-22 {
+		t.Error("Bad diff:", serie2.Fields["col1"], "!= 42 - 22")
 	}
 }
 
-func fillPoints(serie *influxClient.Series, pts *[][]interface{}, sizeX int, sizeY int) {
-	for i := 0; i < sizeX; i++ {
-		if len(serie.Columns) <= i {
-			serie.Columns = append(serie.Columns, fmt.Sprintf("col%d", i))
-			serie.Points = append(serie.Points, []interface{}{})
-		}
-		*pts = append(*pts, []interface{}{})
-
-		for j := 0; j < sizeY; j++ {
-			tmp := rand.Intn(9876543210)
-			(*pts)[i] = append((*pts)[i], tmp)
-			if len(serie.Points[i]) <= j {
-				serie.Points[i] = append(serie.Points[i], tmp)
-			} else {
-				serie.Points[i][j] = tmp
-			}
-		}
+func fillPoints(serie *influxClient.Point, pts *map[string]interface{}, size int) {
+	*pts = map[string]interface{}{}
+	for i := 0; i < size; i++ {
+		tmp := rand.Intn(9876543210)
+		k := fmt.Sprint("col", i)
+		(*pts)[k] = tmp
+		serie.Fields[k] = tmp
 	}
 }
 
 func TestRandom(t *testing.T) {
-	serie := &influxClient.Series{
-		Name:    fmt.Sprintf("test_rnd"),
-		Columns: []string{},
-		Points:  [][]interface{}{},
+	serie := &influxClient.Point{
+		Name:   fmt.Sprintf("test_rnd"),
+		Tags:   map[string]string{"toto": "titi"},
+		Fields: map[string]interface{}{},
 	}
 
-	sizeX := rand.Intn(20) + 10
-	sizeY := rand.Intn(20) + 10
+	size := rand.Intn(30) + 12
 
-	var oldPts, newPts *[][]interface{}
-	newPts = new([][]interface{})
+	var oldPts, newPts *map[string]interface{}
+	newPts = new(map[string]interface{})
 
-	fillPoints(serie, newPts, sizeX, sizeY)
+	fillPoints(serie, newPts, size)
 
 	DiffFromLast(serie)
 
-	for h := 0; h < rand.Intn(50) + 10; h++ {
+	for h := 0; h < rand.Intn(50)+10; h++ {
 		oldPts = newPts
-		newPts = new([][]interface{})
+		newPts = new(map[string]interface{})
 
-		fillPoints(serie, newPts, sizeX, sizeY)
+		fillPoints(serie, newPts, size)
 		DiffFromLast(serie)
 
 		// Compare
-		for i := 0; i < sizeX; i++ {
-			for j := 0; j < sizeY; j++ {
-				if serie.Points[i][j] != (*newPts)[i][j].(int) - (*oldPts)[i][j].(int) {
-					t.Error(fmt.Sprintf("Iteration %d; point %d,%d: expected %d, got %d", h, i, j,
-						(*newPts)[i][j].(int) - (*oldPts)[i][j].(int), serie.Points[i][j]))
-				}
+		for i := 0; i < size; i++ {
+			k := fmt.Sprint("col", i)
+			if serie.Fields[k] != (*newPts)[k].(int)-(*oldPts)[k].(int) {
+				t.Error(fmt.Sprintf("Iteration %d; point %d: expected %d, got %d", h, k,
+					(*newPts)[k].(int)-(*oldPts)[k].(int), serie.Fields[k]))
 			}
 		}
 	}
