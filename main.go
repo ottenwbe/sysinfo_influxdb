@@ -25,7 +25,12 @@ import (
 	"time"
 )
 
-const APP_VERSION = "0.5.2"
+type chan_ret_t struct {
+	series *influxClient.Series
+	err    error
+}
+
+const APP_VERSION = "0.5.3"
 
 // Variables storing arguments flags
 var verboseFlag string
@@ -185,7 +190,7 @@ func main() {
 			prefixFlag += "."
 		}
 
-		ch := make(chan *influxClient.Series, len(collectList))
+		ch := make(chan chan_ret_t, len(collectList))
 
 		// Without daemon mode, do at least one lap
 		first := true
@@ -202,8 +207,10 @@ func main() {
 
 			for i := len(collectList); i > 0; i-- {
 				res := <-ch
-				if res != nil {
-					data = append(data, res)
+				if res.err != nil {
+					fmt.Fprintf(os.Stderr, "%s\n", res.err)
+				} else if res.series != nil {
+					data = append(data, res.series)
 				} else if !daemonFlag {
 					// Loop if we haven't all data:
 					// Since diffed data didn't respond the
@@ -341,9 +348,9 @@ func DiffFromLast(serie *influxClient.Series) *influxClient.Series {
  * Gathering functions
  */
 
-type GatherFunc func(string, chan *influxClient.Series) error
+type GatherFunc func(string, chan chan_ret_t)
 
-func cpu(prefix string, ch chan *influxClient.Series) error {
+func cpu(prefix string, ch chan chan_ret_t) {
 	serie := &influxClient.Series{
 		Name:    prefix + "cpu",
 		Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
@@ -352,16 +359,15 @@ func cpu(prefix string, ch chan *influxClient.Series) error {
 
 	cpu := sigar.Cpu{}
 	if err := cpu.Get(); err != nil {
-		ch <- nil
-		return err
+		ch <- chan_ret_t{nil, err}
+		return
 	}
 	serie.Points = append(serie.Points, []interface{}{"cpu", cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
 
-	ch <- DiffFromLast(serie)
-	return nil
+	ch <- chan_ret_t{DiffFromLast(serie), nil}
 }
 
-func cpus(prefix string, ch chan *influxClient.Series) error {
+func cpus(prefix string, ch chan chan_ret_t) {
 	serie := &influxClient.Series{
 		Name:    prefix + "cpus",
 		Columns: []string{"id", "user", "nice", "sys", "idle", "wait", "total"},
@@ -374,11 +380,10 @@ func cpus(prefix string, ch chan *influxClient.Series) error {
 		serie.Points = append(serie.Points, []interface{}{fmt.Sprint("cpu", i), cpu.User, cpu.Nice, cpu.Sys, cpu.Idle, cpu.Wait, cpu.Total()})
 	}
 
-	ch <- DiffFromLast(serie)
-	return nil
+	ch <- chan_ret_t{DiffFromLast(serie), nil}
 }
 
-func mem(prefix string, ch chan *influxClient.Series) error {
+func mem(prefix string, ch chan chan_ret_t) {
 	serie := &influxClient.Series{
 		Name:    prefix + "mem",
 		Columns: []string{"free", "used", "actualfree", "actualused", "total"},
@@ -387,16 +392,14 @@ func mem(prefix string, ch chan *influxClient.Series) error {
 
 	mem := sigar.Mem{}
 	if err := mem.Get(); err != nil {
-		ch <- nil
-		return err
+		ch <- chan_ret_t{nil, err}
 	}
 	serie.Points = append(serie.Points, []interface{}{mem.Free, mem.Used, mem.ActualFree, mem.ActualUsed, mem.Total})
 
-	ch <- serie
-	return nil
+	ch <- chan_ret_t{serie, nil}
 }
 
-func swap(prefix string, ch chan *influxClient.Series) error {
+func swap(prefix string, ch chan chan_ret_t) {
 	serie := &influxClient.Series{
 		Name:    prefix + "swap",
 		Columns: []string{"free", "used", "total"},
@@ -405,16 +408,15 @@ func swap(prefix string, ch chan *influxClient.Series) error {
 
 	swap := sigar.Swap{}
 	if err := swap.Get(); err != nil {
-		ch <- nil
-		return err
+		ch <- chan_ret_t{nil, err}
+		return
 	}
 	serie.Points = append(serie.Points, []interface{}{swap.Free, swap.Used, swap.Total})
 
-	ch <- serie
-	return nil
+	ch <- chan_ret_t{serie, nil}
 }
 
-func uptime(prefix string, ch chan *influxClient.Series) error {
+func uptime(prefix string, ch chan chan_ret_t) {
 	serie := &influxClient.Series{
 		Name:    prefix + "uptime",
 		Columns: []string{"length"},
@@ -423,16 +425,15 @@ func uptime(prefix string, ch chan *influxClient.Series) error {
 
 	uptime := sigar.Uptime{}
 	if err := uptime.Get(); err != nil {
-		ch <- nil
-		return err
+		ch <- chan_ret_t{nil, err}
+		return
 	}
 	serie.Points = append(serie.Points, []interface{}{uptime.Length})
 
-	ch <- serie
-	return nil
+	ch <- chan_ret_t{serie, nil}
 }
 
-func load(prefix string, ch chan *influxClient.Series) error {
+func load(prefix string, ch chan chan_ret_t) {
 	serie := &influxClient.Series{
 		Name:    prefix + "load",
 		Columns: []string{"one", "five", "fifteen"},
@@ -441,19 +442,19 @@ func load(prefix string, ch chan *influxClient.Series) error {
 
 	load := sigar.LoadAverage{}
 	if err := load.Get(); err != nil {
-		ch <- nil
-		return err
+		ch <- chan_ret_t{nil, err}
+		return
 	}
 	serie.Points = append(serie.Points, []interface{}{load.One, load.Five, load.Fifteen})
 
-	ch <- serie
-	return nil
+	ch <- chan_ret_t{serie, nil}
 }
 
-func network(prefix string, ch chan *influxClient.Series) error {
+func network(prefix string, ch chan chan_ret_t) {
 	fi, err := os.Open("/proc/net/dev")
 	if err != nil {
-		return err
+		ch <- chan_ret_t{nil, err}
+		return
 	}
 	defer fi.Close()
 
@@ -482,8 +483,8 @@ func network(prefix string, ch chan *influxClient.Series) error {
 		line := scanner.Text()
 		tmp := strings.Split(line, ":")
 		if len(tmp) < 2 {
-			ch <- nil
-			return nil
+			ch <- chan_ret_t{nil, nil}
+			return
 		}
 
 		iface := strings.Trim(tmp[0], " ")
@@ -503,14 +504,14 @@ func network(prefix string, ch chan *influxClient.Series) error {
 		serie.Points = append(serie.Points, points)
 	}
 
-	ch <- DiffFromLast(serie)
-	return nil
+	ch <- chan_ret_t{DiffFromLast(serie), nil}
 }
 
-func disks(prefix string, ch chan *influxClient.Series) error {
+func disks(prefix string, ch chan chan_ret_t) {
 	fi, err := os.Open("/proc/diskstats")
 	if err != nil {
-		return err
+		ch <- chan_ret_t{nil, err}
+		return
 	}
 	defer fi.Close()
 
@@ -528,8 +529,8 @@ func disks(prefix string, ch chan *influxClient.Series) error {
 	for scanner.Scan() {
 		tmp := strings.Fields(scanner.Text())
 		if len(tmp) < 14 {
-			ch <- nil
-			return nil
+			ch <- chan_ret_t{nil, nil}
+			return
 		}
 
 		var points []interface{}
@@ -546,11 +547,10 @@ func disks(prefix string, ch chan *influxClient.Series) error {
 		serie.Points = append(serie.Points, points)
 	}
 
-	ch <- DiffFromLast(serie)
-	return nil
+	ch <- chan_ret_t{DiffFromLast(serie), nil}
 }
 
-func mounts(prefix string, ch chan *influxClient.Series) error {
+func mounts(prefix string, ch chan chan_ret_t) {
 	serie := &influxClient.Series{
 		Name:    prefix + "mounts",
 		Columns: []string{"mountpoint", "disk", "free", "total"},
@@ -559,7 +559,8 @@ func mounts(prefix string, ch chan *influxClient.Series) error {
 
 	fi, err := os.Open("/proc/mounts")
 	if err != nil {
-		return err
+		ch <- chan_ret_t{nil, err}
+		return
 	}
 	defer fi.Close()
 
@@ -576,7 +577,8 @@ func mounts(prefix string, ch chan *influxClient.Series) error {
 
 			err := syscall.Statfs(tmp[1], &fs)
 			if err != nil {
-				return err
+				ch <- chan_ret_t{nil, err}
+				return
 			}
 
 			freeBytes := fs.Bfree * uint64(fs.Bsize)
@@ -586,6 +588,5 @@ func mounts(prefix string, ch chan *influxClient.Series) error {
 		}
 	}
 
-	ch <- serie
-	return nil
+	ch <- chan_ret_t{serie, nil}
 }
