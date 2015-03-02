@@ -49,6 +49,7 @@ var usernameFlag string
 var passwordFlag string
 var secretFlag string
 var databaseFlag string
+var retentionPolicyFlag string
 
 func init() {
 	flag.BoolVar(&versionFlag, "version", false, "Print the version number and exit.")
@@ -67,6 +68,8 @@ func init() {
 	flag.StringVar(&secretFlag, "s", "", "Absolute path to password file. '-p' is ignored if specifed.")
 	flag.StringVar(&databaseFlag, "database", "", "Name of the database to use.")
 	flag.StringVar(&databaseFlag, "d", "", "Name of the database to use (shorthand).")
+	flag.StringVar(&retentionPolicyFlag, "retentionpolicy", "", "Name of the retention policy to use.")
+	flag.StringVar(&retentionPolicyFlag, "rp", "", "Name of the retention policy to use (shorthand).")
 
 	flag.StringVar(&collectFlag, "collect", "cpu,cpus,mem,swap,uptime,load,network,disks,mounts", "Chose which data to collect.")
 	flag.StringVar(&collectFlag, "c", "cpu,cpus,mem,swap,uptime,load,network,disks,mounts", "Chose which data to collect (shorthand).")
@@ -246,7 +249,13 @@ func main() {
  */
 
 func send(client *influxClient.Client, series []influxClient.Point) error {
-	_, err := client.Write(influxClient.Write{Database: databaseFlag, RetentionPolicy: "", Points: series})
+	w := influxClient.Write{Database: databaseFlag, Points: series}
+
+	if retentionPolicyFlag != "" {
+		w.RetentionPolicy = retentionPolicyFlag
+	}
+
+	_, err := client.Write(w)
 	return err
 }
 
