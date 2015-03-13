@@ -249,7 +249,7 @@ func main() {
  */
 
 func send(client *influxClient.Client, series []influxClient.Point) error {
-	w := influxClient.Write{Database: databaseFlag, Points: series}
+	w := influxClient.BatchPoints{Database: databaseFlag, Points: series}
 
 	if retentionPolicyFlag != "" {
 		w.RetentionPolicy = retentionPolicyFlag
