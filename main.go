@@ -275,7 +275,7 @@ func DiffFromLast(serie *influxClient.Point) *influxClient.Point {
 	}
 	sort.Strings(keys)
 
-	key := serie.Name + "#"
+	key := serie.Measurement + "#"
 	for _, k := range keys {
 		key += k + ":" + serie.Tags[k] + "|"
 	}
@@ -340,7 +340,7 @@ func cpu(ch chan chan_ret_t) {
 	}
 
 	serie := &influxClient.Point{
-		Name: "cpu",
+		Measurement: "cpu",
 		Tags: map[string]string{
 			"cpuid": "all",
 		},
@@ -364,7 +364,7 @@ func cpus(ch chan chan_ret_t) {
 	cpus.Get()
 	for i, cpu := range cpus.List {
 		serie := &influxClient.Point{
-			Name: "cpus",
+			Measurement: "cpus",
 			Tags: map[string]string{
 				"cpuid": fmt.Sprint(i),
 			},
@@ -393,7 +393,7 @@ func mem(ch chan chan_ret_t) {
 	}
 
 	serie := &influxClient.Point{
-		Name: "mem",
+		Measurement: "mem",
 		Fields: map[string]interface{}{
 			"free":       mem.Free,
 			"used":       mem.Used,
@@ -414,7 +414,7 @@ func swap(ch chan chan_ret_t) {
 	}
 
 	serie := &influxClient.Point{
-		Name: "swap",
+		Measurement: "swap",
 		Fields: map[string]interface{}{
 			"free":  swap.Free,
 			"used":  swap.Used,
@@ -433,7 +433,7 @@ func uptime(ch chan chan_ret_t) {
 	}
 
 	serie := &influxClient.Point{
-		Name: "uptime",
+		Measurement: "uptime",
 		Fields: map[string]interface{}{
 			"length": uptime.Length,
 		},
@@ -450,7 +450,7 @@ func load(ch chan chan_ret_t) {
 	}
 
 	serie := &influxClient.Point{
-		Name: "load",
+		Measurement: "load",
 		Fields: map[string]interface{}{
 			"one":     load.One,
 			"five":    load.Five,
@@ -495,7 +495,7 @@ func network(ch chan chan_ret_t) {
 		}
 
 		serie := &influxClient.Point{
-			Name: "network",
+			Measurement: "network",
 			Tags: map[string]string{
 				"iface": strings.Trim(tmp[0], " "),
 			},
@@ -543,7 +543,7 @@ func disks(ch chan chan_ret_t) {
 		}
 
 		serie := &influxClient.Point{
-			Name: "disks",
+			Measurement: "disks",
 			Tags: map[string]string{
 				"iface": strings.Trim(tmp[0], " "),
 			},
@@ -597,7 +597,7 @@ func mounts(ch chan chan_ret_t) {
 			}
 
 			serie := &influxClient.Point{
-				Name: "mounts",
+				Measurement: "mounts",
 				Tags: map[string]string{
 					"disk":       tmp[0],
 					"mountpoint": tmp[1],

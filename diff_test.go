@@ -18,7 +18,7 @@ import (
 
 func TestSimple(t *testing.T) {
 	serie1 := &influxClient.Point{
-		Name:   "test_init",
+		Measurement:   "test_init",
 		Tags:   map[string]string{"tag0": "val0"},
 		Fields: map[string]interface{}{"col0": 42},
 	}
@@ -27,7 +27,7 @@ func TestSimple(t *testing.T) {
 		t.Error("First time, initialization can't return a valid serie")
 	}
 
-	if serie1.Name != "test_init" {
+	if serie1.Measurement != "test_init" {
 		t.Error("DiffFromLast shouldn't modify serie name")
 	}
 
@@ -44,7 +44,7 @@ func TestSimple(t *testing.T) {
 	}
 
 	serie2 := &influxClient.Point{
-		Name:   "test_init_other",
+		Measurement:   "test_init_other",
 		Tags:   map[string]string{"tag0": "val0", "tag1": "val1"},
 		Fields: map[string]interface{}{"col1": 22, "col0": 23},
 	}
@@ -84,7 +84,7 @@ func fillPoints(serie *influxClient.Point, pts *map[string]interface{}, size int
 
 func TestRandom(t *testing.T) {
 	serie := &influxClient.Point{
-		Name:   fmt.Sprintf("test_rnd"),
+		Measurement:   fmt.Sprintf("test_rnd"),
 		Tags:   map[string]string{"toto": "titi"},
 		Fields: map[string]interface{}{},
 	}
