@@ -44,6 +44,7 @@ var consistencyFactor = 1.0
 var collectFlag string
 var pidFile string
 
+var sslFlag bool
 var hostFlag string
 var usernameFlag string
 var passwordFlag string
@@ -58,6 +59,8 @@ func init() {
 	flag.BoolVar(&verboseFlag, "verbose", false, "Display debug information: choose between text or JSON.")
 	flag.BoolVar(&verboseFlag, "v", false, "Display debug information: choose between text or JSON (shorthand).")
 
+	flag.BoolVar(&sslFlag, "ssl", false, "Enable SSL/TLS encryption.")
+	flag.BoolVar(&sslFlag, "S", false, "Enable SSL/TLS encryption (shorthand).")
 	flag.StringVar(&hostFlag, "host", "localhost:8086", "Connect to host.")
 	flag.StringVar(&hostFlag, "h", "localhost:8086", "Connect to host (shorthand).")
 	flag.StringVar(&usernameFlag, "username", "root", "User for login.")
@@ -129,7 +132,13 @@ func main() {
 		// Fill InfluxDB connection settings
 		var client *influxClient.Client = nil
 		if databaseFlag != "" {
-			var u, _ = url.Parse("http://" + hostFlag + "/")
+			var proto string
+			if sslFlag {
+				proto = "https"
+			} else {
+				proto = "http"
+			}
+			var u, _ = url.Parse(fmt.Sprintf("%s://%s/", proto, hostFlag))
 			config := influxClient.Config{URL: *u, Username: usernameFlag, UserAgent: "sysinfo_influxdb v" + APP_VERSION}
 
 			// use secret file if present, fallback to CLI password arg
