@@ -32,7 +32,7 @@ type chan_ret_t struct {
 	err    error
 }
 
-const APP_VERSION = "0.5.5"
+const APP_VERSION = "0.5.6"
 
 // Variables storing arguments flags
 var verboseFlag bool
@@ -226,9 +226,6 @@ func main() {
 
 			if !first {
 				for _, serie := range data {
-					if serie.Tags == nil {
-						serie.Tags = map[string]string{}
-					}
 					serie.Tags["fqdn"] = getFqdn()
 				}
 
@@ -403,6 +400,7 @@ func mem(ch chan chan_ret_t) {
 
 	serie := &influxClient.Point{
 		Measurement: "mem",
+		Tags: map[string]string{},
 		Fields: map[string]interface{}{
 			"free":       mem.Free,
 			"used":       mem.Used,
@@ -424,6 +422,7 @@ func swap(ch chan chan_ret_t) {
 
 	serie := &influxClient.Point{
 		Measurement: "swap",
+		Tags: map[string]string{},
 		Fields: map[string]interface{}{
 			"free":  swap.Free,
 			"used":  swap.Used,
@@ -443,6 +442,7 @@ func uptime(ch chan chan_ret_t) {
 
 	serie := &influxClient.Point{
 		Measurement: "uptime",
+		Tags: map[string]string{},
 		Fields: map[string]interface{}{
 			"length": uptime.Length,
 		},
@@ -460,6 +460,7 @@ func load(ch chan chan_ret_t) {
 
 	serie := &influxClient.Point{
 		Measurement: "load",
+		Tags: map[string]string{},
 		Fields: map[string]interface{}{
 			"one":     load.One,
 			"five":    load.Five,
@@ -554,7 +555,7 @@ func disks(ch chan chan_ret_t) {
 		serie := &influxClient.Point{
 			Measurement: "disks",
 			Tags: map[string]string{
-				"iface": strings.Trim(tmp[0], " "),
+				"device": strings.Trim(tmp[2], " "),
 			},
 			Fields: map[string]interface{}{},
 		}
