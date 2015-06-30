@@ -1,6 +1,6 @@
 # sysinfo_influxdb
 
-[![Gobuild Download](https://img.shields.io/badge/gobuild-download-green.svg)](http://gobuild.io/github.com/novaquark/sysinfo_influxdb) [![Build Status](http://img.shields.io/travis/novaquark/sysinfo_influxdb.svg)](https://travis-ci.org/novaquark/sysinfo_influxdb)
+[![Build Status](https://api.travis-ci.org/novaquark/sysinfo_influxdb.svg)](https://travis-ci.org/novaquark/sysinfo_influxdb)
 
 A collecting tool of system metrics (CPU, memory, load, disks I/Os, network traffic) to an [InfluxDB](http://influxdb.org) server.
 
@@ -26,15 +26,6 @@ Password can also be read from a file if you don't want to specify it in CLI (`-
 
 You can ommit `-h`, `-u`, `-p` or `-s` if you use default settings.
 
-By default, table are prefixed by the hostname, to change or disable the prefix, just do :
-
-    $GOPATH/bin/sysinfo_influxdb -P "" # Disable prefix
-    $GOPATH/bin/sysinfo_influxdb -P "koala"
-
-To append FQDN of the running host at the end of injected data, use the `--fqdn` flag :
-
-    $GOPATH/bin/sysinfo_influxdb --fqdn
-
 To run in daemon mode (doesn't fork, just loop), use the `-D` option :
 
     $GOPATH/bin/sysinfo_influxdb -D
@@ -55,127 +46,277 @@ To change data collected, use the `-c` option with one or more metrics type (`cp
 
 On Linux hardened kernel, you must be allowed to read `/proc/net/dev` in order to collect networking statistics.
 
-## Output format
+## Sample outputs
 
 ### CPU
 
-#### Text
-
-	#0: koala.cpu
-	| id  | user  | nice  | sys | idle  | wait  | total |
-	| cpu | 4 | 4 | 2 | 794 | 3 | 807 |
-
-#### JSON
-
-	[{"name":"koala.cpu","columns":["id","user","nice","sys","idle","wait","total"],"points":[["cpu",3,0,1,795,0,799]]}]
+	[
+	  {
+	    "measurement": "cpu",
+	    "tags": {
+	      "cpuid": "all",
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "idle": 149,
+	      "nice": 0,
+	      "sys": 7,
+	      "total": 190,
+	      "user": 26,
+	      "wait": 0
+	    }
+	  }
+	]
 
 ### CPUs
 
-#### Text
-
-	#0: koala.cpus
-	| id	| user	| nice	| sys	| idle	| wait	| total	|
-	| cpu0	| 1	| 1	| 1	| 95	| 2	| 100	|
-	| cpu1	| 1	| 0	| 1	| 99	| 0	| 101	|
-	| cpu2	| 1	| 0	| 0	| 99	| 0	| 100	|
-	| cpu3	| 1	| 1	| 1	| 99	| 0	| 102	|
-
-#### JSON
-
-	[{"name":"koala.cpus","columns":["id","user","nice","sys","idle","wait","total"],"points":[["cpu0",0,0,0,99,0,99],["cpu1",0,0,1,99,0,100],["cpu2",1,0,0,99,0,100],["cpu3",1,0,1,98,0,100]]}]
+	[
+	  {
+	    "measurement": "cpus",
+	    "tags": {
+	      "cpuid": "0",
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "idle": 69,
+	      "nice": 0,
+	      "sys": 6,
+	      "total": 95,
+	      "user": 14,
+	      "wait": 0
+	    }
+	  },
+	  {
+	    "measurement": "cpus",
+	    "tags": {
+	      "cpuid": "1",
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "idle": 84,
+	      "nice": 0,
+	      "sys": 2,
+	      "total": 97,
+	      "user": 11,
+	      "wait": 0
+	    }
+	  }
+	]
 
 ### Memory
 
-#### Text
-
-	#0: koala.mem
-	| free		| used		| actualfree	| actualused	| total		|
-	| 2004123648	| 6305091584	| 3761774592	| 4547440640	| 8309215232	|
-
-#### JSON
-
-	[{"name":"koala.mem","columns":["free","used","actualfree","actualused","total"],"points":[[2004123648,6305091584,3761774592,4547440640,8309215232]]}]
+	[
+	  {
+	    "measurement": "mem",
+	    "tags": {
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "actualfree": 460017664,
+	      "actualused": 460308480,
+	      "free": 153395200,
+	      "total": 920326144,
+	      "used": 766930944
+	    }
+	  }
+	]
 
 ### Swap
 
-#### Text
-
-	#0: koala.swap
-	| free		| used	| total		|
-	| 8589930496	| 0	| 8589930496	|
-
-
-#### JSON
-
-	[{"name":"koala.swap","columns":["free","used","total"],"points":[[8589930496,0,8589930496]]}]
+	[
+	  {
+	    "measurement": "swap",
+	    "tags": {
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "free": 2145689600,
+	      "total": 2147479552,
+	      "used": 1789952
+	    }
+	  }
+	]
 
 ### Uptime
 
-#### Text
-
-	#0: koala.uptime
-	| length	|
-	| 285235	|
-
-#### JSON
-
-	[{"name":"koala.uptime","columns":["length"],"points":[[285235]]}]
+	[
+	  {
+	    "measurement": "uptime",
+	    "tags": {
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "length": 154954
+	    }
+	  }
+	]
 
 ### Load average
 
-#### Text
-
-	#0: koala.load
-	| one	| five	| fifteen	|
-	| 0.19	| 0.17	| 0.15		|
-
-#### JSON
-
-	[{"name":"koala.load","columns":["one","five","fifteen"],"points":[[0.19,0.17,0.15]]}]
+	[
+	  {
+	    "measurement": "load",
+	    "tags": {
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "fifteen": 1.05,
+	      "five": 1.05,
+	      "one": 0.82
+	    }
+	  }
+	]
 
 
 ### Network
 
-#### Text
-
-	#0: koala.network
-	| iface	| recv_bytes	| recv_packets	| recv_errs	| recv_drop	| recv_fifo	| recv_frame	| recv_compressed | recv_multicast | trans_bytes | trans_packets | trans_errs | trans_drop | trans_fifo | trans_colls | trans_carrier | trans_compressed |
-	| br0	| 1934		| 16		| 0		| 0		| 0		| 0		| 0		  | 0		   | 2592	 | 20		 | 0	      | 0	   | 0		| 0	      | 0	      | 0		 |
-	| vnet1	| 0		| 0		| 0		| 0		| 0		| 0		| 0		  | 0		   | 969	 | 8		 | 0	      | 0	   | 0		| 0	      | 0	      | 0		 |
-	| eth0	| 2158		| 16		| 0		| 0		| 0		| 0		| 0		  | 0		   | 2644	 | 21		 | 0	      | 0	   | 0		| 0	      | 0	      | 0		 |
-	| lo	| 0		| 0		| 0		| 0		| 0		| 0		| 0		  | 0		   | 0		 | 0		 | 0	      | 0	   | 0		| 0	      | 0	      | 0		 |
-
-#### JSON
-
-	[{"name":"koala.network","columns":["iface","recv_bytes","recv_packets","recv_errs","recv_drop","recv_fifo","recv_frame","recv_compressed","recv_multicast","trans_bytes","trans_packets","trans_errs","trans_drop","trans_fifo","trans_colls","trans_carrier","trans_compressed"],"points":[["br0",2461,22,0,0,0,0,0,0,2674,21,0,0,0,0,0,0],["vnet1",0,0,0,0,0,0,0,0,1572,12,0,0,0,0,0,0],["eth0",2769,22,0,0,0,0,0,0,2674,21,0,0,0,0,0,0],["lo",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}]
+	[
+	  {
+	    "measurement": "network",
+	    "tags": {
+	      "fqdn": "koala",
+	      "iface": "lo"
+	    },
+	    "fields": {
+	      "recv_bytes": 0,
+	      "recv_compressed": 0,
+	      "recv_drop": 0,
+	      "recv_errs": 0,
+	      "recv_fifo": 0,
+	      "recv_frame": 0,
+	      "recv_multicast": 0,
+	      "recv_packets": 0,
+	      "trans_bytes": 0,
+	      "trans_carrier": 0,
+	      "trans_colls": 0,
+	      "trans_compressed": 0,
+	      "trans_drop": 0,
+	      "trans_errs": 0,
+	      "trans_fifo": 0,
+	      "trans_packets": 0
+	    }
+	  },
+	  {
+	    "measurement": "network",
+	    "tags": {
+	      "fqdn": "koala",
+	      "iface": "eth0"
+	    },
+	    "fields": {
+	      "recv_bytes": 156,
+	      "recv_compressed": 0,
+	      "recv_drop": 0,
+	      "recv_errs": 0,
+	      "recv_fifo": 0,
+	      "recv_frame": 0,
+	      "recv_multicast": 0,
+	      "recv_packets": 2,
+	      "trans_bytes": 206,
+	      "trans_carrier": 0,
+	      "trans_colls": 0,
+	      "trans_compressed": 0,
+	      "trans_drop": 0,
+	      "trans_errs": 0,
+	      "trans_fifo": 0,
+	      "trans_packets": 3
+	    }
+	  }
+	]
 
 ### Disks I/Os
 
-#### Text
-
-	#0: koala.disks
-	| device    | read_ios	| read_merges	| read_sectors	| read_ticks	| write_ios	| write_merges	| write_sectors	| write_ticks | in_flight | io_ticks | time_in_queue |
-	| sda	    | 0		| 0		| 0		| 0		| 0		| 0		| 0		| 0	      | 0	  | 0	     | 0	     |
-	| sda1	    | 0		| 0		| 0		| 0		| 0		| 0		| 0		| 0	      | 0	  | 0	     | 0	     |
-	| sda2	    | 0		| 0		| 0		| 0		| 0		| 0		| 0		| 0	      | 0	  | 0	     | 0	     |
-
-#### JSON
-
-	[{"name":"koala.disks","columns":["device","read_ios","read_merges","read_sectors","read_ticks","write_ios","write_merges","write_sectors","write_ticks","in_flight","io_ticks","time_in_queue"],"points":[["sda",0,0,0,0,0,0,0,0,0,0,0],["sda1",0,0,0,0,0,0,0,0,0,0,0],["sda2",0,0,0,0,0,0,0,0,0,0,0]]}]
+	[
+	  {
+	    "measurement": "disks",
+	    "tags": {
+	      "device": "sda",
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "in_flight": 0,
+	      "io_ticks": 0,
+	      "read_ios": 0,
+	      "read_merges": 0,
+	      "read_sectors": 0,
+	      "read_ticks": 0,
+	      "time_in_queue": 0,
+	      "write_ios": 0,
+	      "write_merges": 0,
+	      "write_sectors": 0,
+	      "write_ticks": 0
+	    }
+	  },
+	  {
+	    "measurement": "disks",
+	    "tags": {
+	      "device": "sda1",
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "in_flight": 0,
+	      "io_ticks": 0,
+	      "read_ios": 0,
+	      "read_merges": 0,
+	      "read_sectors": 0,
+	      "read_ticks": 0,
+	      "time_in_queue": 0,
+	      "write_ios": 0,
+	      "write_merges": 0,
+	      "write_sectors": 0,
+	      "write_ticks": 0
+	    }
+	  },
+	  {
+	    "measurement": "disks",
+	    "tags": {
+	      "device": "sda2",
+	      "fqdn": "koala"
+	    },
+	    "fields": {
+	      "in_flight": 0,
+	      "io_ticks": 0,
+	      "read_ios": 0,
+	      "read_merges": 0,
+	      "read_sectors": 0,
+	      "read_ticks": 0,
+	      "time_in_queue": 0,
+	      "write_ios": 0,
+	      "write_merges": 0,
+	      "write_sectors": 0,
+	      "write_ticks": 0
+	    }
+	  }
+	]
 
 ### Mountpoints
 
-#### Text
+	[
+	  {
+	    "measurement": "mounts",
+	    "tags": {
+	      "disk": "/dev/root",
+	      "fqdn": "koala",
+	      "mountpoint": "/"
+	    },
+	    "fields": {
+	      "free": 0,
+	      "total": 0
+	    }
+	  },
+	  {
+	    "measurement": "mounts",
+	    "tags": {
+	      "disk": "/dev/sda2",
+	      "fqdn": "koala",
+	      "mountpoint": "/home"
+	    },
+	    "fields": {
+	      "free": 0,
+	      "total": 0
+	    }
+	  }
+	]
 
-    #0: koala.mounts
-    | mountpoint    | disk	    | free	        | total	        |
-    | /	            | /dev/sda2	| 117969465344	| 125855354880	|
-    | /home	        | /dev/sda6 | 50837757952   | 242004779008  |
-    | /boot	        | /dev/sda1	| 329293824	    | 486123520	    |
-
-#### JSON
-
-    [{"name":"koala.mounts","columns":["mountpoint","disk","free","total"],"points":[["/","/dev/sda2",117969465344,125855354880],["/home","/dev/sda6",50837757952,242004779008],["/boot","/dev/sda1",329293824,486123520]]}]
 
 ## Building
 
