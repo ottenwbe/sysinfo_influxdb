@@ -1,5 +1,7 @@
 # sysinfo_influxdb
 
+Moved fork to: https://github.com/ottenwbe/influxdb_reporter
+
 [![Build Status](https://api.travis-ci.org/novaquark/sysinfo_influxdb.svg)](https://travis-ci.org/novaquark/sysinfo_influxdb)
 
 A collecting tool of system metrics (CPU, memory, load, disks I/Os, network traffic) to an [InfluxDB](http://influxdb.org) server.
